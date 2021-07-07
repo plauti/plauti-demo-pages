@@ -16,7 +16,7 @@ input[type=text], select {
 }
 
 
-input[type=submit] {
+button {
   width: 100%;
   background-color: #4CAF50;
   color: white;
@@ -28,7 +28,7 @@ input[type=submit] {
   font-family: "Lucida Console", "Courier New", monospace;
 }
 
-input[type=submit]:hover {
+button:hover {
   background-color: #45a049;
 }
 
