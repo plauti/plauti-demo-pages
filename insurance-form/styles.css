@@ -3,6 +3,7 @@
   width: 50%;
   padding: 10px;
   font-family: "Lucida Console", "Courier New", monospace;
+  z-index:2;
 }
 
 input[type=text], input[type=email], select {
@@ -32,3 +33,11 @@ button:hover {
   background-color: #45a049;
 }
 
+.image {
+	width: 612px;
+	height: 292px;
+	background-image: url("car.png");
+	position:absolute;
+	z-index:-1;
+	opacity:0.3;
+}
