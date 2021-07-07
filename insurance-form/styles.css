@@ -39,5 +39,5 @@ button:hover {
 	background-image: url("car.png");
 	position:absolute;
 	z-index:-1;
-	opacity:0.3;
+	opacity:0.2;
 }
