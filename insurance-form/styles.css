@@ -37,7 +37,7 @@ button:hover {
 	width: 500px;
 	height: 500px;
 	background-image: url("brochure.png");
-	position:absolute;
+	position:relative;
+	left: 100px;
 	z-index:-1;
-	opacity:0.2;
 }
