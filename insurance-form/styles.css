@@ -38,6 +38,5 @@ button:hover {
 	height: 500px;
 	background-image: url("brochure.png");
 	position:relative;
-	left: 100px;
 	z-index:-1;
 }
