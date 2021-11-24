@@ -39,7 +39,18 @@
   
 <label for="state">State / Province</label><input id="state" maxlength="80" name="state" size="20" type="text" /><br>
   
-<label for="country">Country</label><input id="country" maxlength="80" name="country" size="20" type="text" /><br>
+<!-- having a country is mandatory for address validation -->
+<!-- so we offer a country select with a default preselection. -->
+<!-- this makes it also possible to show that partial addresses (only street+postalcode) get validated. -->
+<label for="country">Country</label>
+  <select id="country" name="country">
+    <option value="NL" selected>Netherlands</option>
+    <option value="UK">United Kingdom</option>
+    <option value="DE">Germany</option>
+    <option value="USA">United States of America</option>
+    <option value="BE">Belgium</option>
+    <option value="DE">Germany</option>
+  </select>
 
 <input id="dupcheck__dc3Web2Lead__c" name="dupcheck__dc3Web2Lead__c" type="hidden" value="1" />
 
