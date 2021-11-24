@@ -40,3 +40,11 @@ button:hover {
 	position:relative;
 	z-index:-1;
 }
+
+.koala {
+	width: 500px;
+	height: 549px;
+	background-image: url("koala.png");
+	position:relative;
+	z-index:-1;
+}
