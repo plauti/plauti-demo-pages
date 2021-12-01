@@ -54,5 +54,4 @@ button:hover {
 	width: 500px;
 	background-image: url("pdm.png");
 	position:relative;
-	z-index:-1;
 }
