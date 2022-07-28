@@ -13,11 +13,10 @@
 
 <form action="https://webto.salesforce.com/servlet/servlet.WebToLead?encoding=UTF-8" method="POST">
 
-<input type=hidden name="oid" value="00D7Q0000091SDaUAM">
+<input type=hidden name="oid" value="00D0Y000000LRcuUAG">
 <input type=hidden name="retURL" value="https://plauti.github.io/plauti-demo-pages/insurance-form/thanks_all.html">
-<input type="hidden" name="Campaign_ID" value="7017Q000000t71MQAQ" />
+<input type="hidden" name="Campaign_ID" value="7011n0000017gWLAAY" />
 <input type="hidden" name="member_status" value="Responded" />
-
 
 <label for="first_name">First Name</label><input required id="first_name" maxlength="40" name="first_name" size="20" type="text" /><br>
 
@@ -41,18 +40,7 @@
   
 <label for="state">State / Province</label><input id="state" maxlength="80" name="state" size="20" type="text" /><br>
   
-<!-- having a country is mandatory for address validation -->
-<!-- so we offer a country select with a default preselection. -->
-<!-- this makes it also possible to show that partial addresses (only street+postalcode) get validated. -->
-<label for="country">Country</label>
-  <select id="country" name="country">
-    <option value="NL" selected>Netherlands</option>
-    <option value="UK">United Kingdom</option>
-    <option value="DE">Germany</option>
-    <option value="USA">United States of America</option>
-    <option value="BE">Belgium</option>
-    <option value="DE">Germany</option>
-  </select>
+<label for="country">Country</label><input id="country" maxlength="80" name="country" size="20" type="text" /><br>
 
 <input id="dupcheck__dc3Web2Lead__c" name="dupcheck__dc3Web2Lead__c" type="hidden" value="1" />
 
