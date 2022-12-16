@@ -1,0 +1,54 @@
+<html>
+<head>
+<link rel="stylesheet" href="styles.css">
+<title>Request More Information</title>
+</head>
+<body>
+<br /><br />
+<div class="center">
+<h1>This webform will create a new Lead in Salesforce.</h1>
+<br />
+<META HTTP-EQUIV="Content-type" CONTENT="text/html; charset=UTF-8">
+
+
+<form action="https://webto.salesforce.com/servlet/servlet.WebToLead?encoding=UTF-8" method="POST">
+
+<input type=hidden name="oid" value="com00D68000001Yuzk">
+<input type=hidden name="retURL" value="https://plauti.github.io/plauti-demo-pages/insurance-form/thanks_all.html">
+
+
+<label for="first_name">First Name</label><input required id="first_name" maxlength="40" name="first_name" size="20" type="text" /><br>
+
+<label for="last_name">Last Name</label><input required id="last_name" maxlength="80" name="last_name" size="20" type="text" /><br>
+
+<label for="email">Email</label><input required id="email" maxlength="80" name="email" size="20" type="email" /><br>
+  
+<label for="mobile">Mobile Phone</label><input id="mobile" maxlength="40" name="mobile" size="20" type="text" /><br>
+  
+<label for="company">Company</label><input required id="company" maxlength="80" name="company" size="20" type="text" /><br>
+  
+ <h2>Address</h2>
+  
+<br />
+  
+<label for="street">Street</label><input id="street" maxlength="80" name="street" size="20" type="text" /><br>
+  
+<label for="city">City</label><input id="city" maxlength="80" name="city" size="20" type="text" /><br>
+  
+<label for="zip">Zip / Postal Code</label><input id="zip" maxlength="20" name="zip" size="20" type="text" /><br>
+  
+<label for="state">State / Province</label><input id="state" maxlength="80" name="state" size="20" type="text" /><br>
+  
+<label for="country">Country</label><input id="country" maxlength="80" name="country" size="20" type="text" /><br>
+
+<input id="dupcheck__dc3Web2Lead__c" name="dupcheck__dc3Web2Lead__c" type="hidden" value="1" />
+
+<br /><br />
+
+<button type="submit" name="submit">Send it</button>
+  
+<br />
+
+</form>
+</div>
+</body>
