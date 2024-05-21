@@ -9,7 +9,7 @@ document.getElementById('searchForm').addEventListener('submit', async function 
     const accessToken = '6Cel800D09000000HnAr888J8000000sXxeK44sLVqG26n3MsTvj86zay8VnDaTxwIaDg71kvcfFdFuXIHMEnT6geDHCYfbXt6BH3ltmDxZ'; // Use the obtained access token
 
     try {
-        const response = await fetch('https://regressiondc-dev-ed.lightning.force.com/services/apexrest/dupcheck/dc3Api/search', {
+        const response = await fetch('https://cors-anywhere.herokuapp.com/https://regressiondc-dev-ed.lightning.force.com/services/apexrest/dupcheck/dc3Api/search', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
