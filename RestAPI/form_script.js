@@ -1,9 +1,32 @@
+// Function to generate a random string for the code verifier
+function generateCodeVerifier() {
+    const array = new Uint32Array(56/2);
+    window.crypto.getRandomValues(array);
+    return Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('');
+}
+
+// Function to generate a code challenge from the code verifier
+async function generateCodeChallenge(codeVerifier) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(codeVerifier);
+    const digest = await window.crypto.subtle.digest('SHA-256', data);
+    return btoa(String.fromCharCode.apply(null, new Uint8Array(digest)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 const clientId = '3MVG9SOw8KERNN08ASeJx0QwxBEyzGBgx45RokPcO_T0MbYXhfwtaoZUxADR8xaw_4LaNSFNBauoDgUz3JM_p';
 const clientSecret = 'F0A89702BA866F7EBC9483D34A6946FA56646C72295FB9AE91E0F03551119B86';
 const redirectUri = 'https://plauti.github.io/plauti-demo-pages/RestAPI/';
 
+const codeVerifier = generateCodeVerifier();
+let codeChallenge;
+
+generateCodeChallenge(codeVerifier).then(challenge => {
+    codeChallenge = challenge;
+});
+
 document.getElementById('loginBtn').addEventListener('click', () => {
-    const authorizationUrl = `https://login.salesforce.com/services/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}`;
+    const authorizationUrl = `https://login.salesforce.com/services/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
     window.location.href = authorizationUrl;
 });
 
@@ -22,7 +45,8 @@ window.onload = async () => {
                 'code': code,
                 'client_id': clientId,
                 'client_secret': clientSecret,
-                'redirect_uri': redirectUri
+                'redirect_uri': redirectUri,
+                'code_verifier': codeVerifier
             })
         });
 
