@@ -26,6 +26,12 @@ document.getElementById('searchForm').addEventListener('submit', async function 
                 }
             })
         });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Error ${response.status}: ${errorText}`);
+        }
+
         const data = await response.json();
         displayResults(data);
     } catch (error) {
