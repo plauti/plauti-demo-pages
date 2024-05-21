@@ -1,5 +1,6 @@
-const clientId = 'YOUR_CLIENT_ID';
-const redirectUri = 'https://yourusername.github.io/oauth-callback';
+const clientId = '3MVG9SOw8KERNN08ASeJx0QwxBEyzGBgx45RokPcO_T0MbYXhfwtaoZUxADR8xaw_4LaNSFNBauoDgUz3JM_p';
+const clientSecret = 'F0A89702BA866F7EBC9483D34A6946FA56646C72295FB9AE91E0F03551119B86';
+const redirectUri = 'https://plauti.github.io/plauti-demo-pages/RestAPI/';
 
 document.getElementById('loginBtn').addEventListener('click', () => {
     const authorizationUrl = `https://login.salesforce.com/services/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}`;
@@ -20,7 +21,7 @@ window.onload = async () => {
                 'grant_type': 'authorization_code',
                 'code': code,
                 'client_id': clientId,
-                'client_secret': 'YOUR_CLIENT_SECRET',
+                'client_secret': clientSecret,
                 'redirect_uri': redirectUri
             })
         });
