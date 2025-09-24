@@ -117,6 +117,8 @@
     .schedule{margin-top:16px}
     .pair{padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:#ffffff; margin-top:8px}
     .pair.played{ opacity:.6 }
+    /* Breathing room under panel headers in Players tab */
+    #playersSection .panel > div:first-child{ margin-bottom: 10px }
 
     footer{margin:24px 0; color:var(--muted); font-size:12px}
 
@@ -202,15 +204,15 @@
     <section id="playersSection" class="picker" role="tabpanel" aria-labelledby="tabPlayers">
       <div id="playersLockedMsg" class="locked-msg" aria-live="polite"></div>
       <div class="panel" aria-labelledby="available-title">
-        <div style="display:flex; justify-content:space-between; align-items:end; gap:8px">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px">
           <h2 id="available-title">Available Players <span class="counts" id="countNot">(0)</span></h2>
-          <button id="btnAddPlayer" class="btn" type="button" aria-label="Add incidental player">Add player</button>
+          <button id="btnAddPlayer" class="btn" type="button" aria-label="Add New Player">Add New Player</button>
         </div>
         <div id="listNot" class="lists" role="list" aria-label="Available players list"></div>
       </div>
 
       <div class="panel" aria-labelledby="playing-title">
-        <div style="display:flex; justify-content:space-between; align-items:end; gap:8px">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px">
           <h2 id="playing-title">Playing Today <span class="counts" id="countPlay">(0/16)</span></h2>
         </div>
         <div id="listPlay" class="lists" role="list" aria-label="Playing list"></div>
