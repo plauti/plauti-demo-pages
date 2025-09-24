@@ -99,11 +99,24 @@
     .swatch{width:16px; height:16px; border-radius:50%; display:inline-block; border:1px solid rgba(0,0,0,.15)}
     .team-name[contenteditable="true"]{padding:2px 6px; border-radius:6px}
     .team-name[contenteditable="true"]:focus{outline:2px solid var(--focus)}
-    .team-pill{ display:inline-flex; align-items:center; gap:8px; padding:4px 8px; border-radius:999px; border:1px solid #e5e7eb; background:#fff; }
+    .team-pill{ display:inline-flex; align-items:center; gap:8px; padding:4px 8px; border-radius:999px; border:1px solid #e5e7eb; background:#fff; align-self:flex-start }
     .team-pill .pill-swatch{ width:14px; height:14px; border-radius:50%; border:1px solid rgba(0,0,0,.15); display:inline-block }
+    .team-sub{ display:block; margin-top:4px; font-size:11px; color:var(--muted); }
+    .team-pill.winner{ color:#fff; }
+    .gd-pos{ color: var(--accent-2); }
+    .gd-neg{ color: var(--danger); }
+    /* Teams: vertically center cells */
+    #teamsSection table th,
+    #teamsSection table td{ vertical-align: middle }
+
+    /* Leaderboard: vertically center stats cells */
+    #leaderboardSection table th,
+    #leaderboardSection table td{ vertical-align: middle }
+    #leaderboardSection table th.sorted::after{ content: ' \2193'; font-size:12px; color: var(--muted) }
 
     .schedule{margin-top:16px}
     .pair{padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:#ffffff; margin-top:8px}
+    .pair.played{ opacity:.6 }
 
     footer{margin:24px 0; color:var(--muted); font-size:12px}
 
@@ -165,6 +178,11 @@
     .winner-banner{ font-size:28px; font-weight:800; text-align:center; color:#111827; letter-spacing:.5px; margin:8px 0 12px }
     .confetti{ position: fixed; top:-10px; width:8px; height:14px; opacity:.9; z-index:55; pointer-events:none }
     @keyframes confetti-fall{ from{ transform: translateY(-10vh) rotate(0deg)} to{ transform: translateY(110vh) rotate(360deg)} }
+
+    /* Players tab locked state */
+    #playersSection.locked .panel{ opacity:.5; pointer-events:none }
+    #playersSection .locked-msg{ display:none; background:#fff8e1; border:1px solid #fde68a; color:#b45309; padding:10px 12px; border-radius:8px; font-weight:700; margin:0 0 8px 0 }
+    #playersSection.locked .locked-msg{ display:block }
   </style>
 </head>
 <body>
@@ -182,6 +200,7 @@
   </nav>
   <main>
     <section id="playersSection" class="picker" role="tabpanel" aria-labelledby="tabPlayers">
+      <div id="playersLockedMsg" class="locked-msg" aria-live="polite"></div>
       <div class="panel" aria-labelledby="available-title">
         <div style="display:flex; justify-content:space-between; align-items:end; gap:8px">
           <h2 id="available-title">Available Players <span class="counts" id="countNot">(0)</span></h2>
@@ -288,6 +307,20 @@
     </div>
   </div>
 
+  <!-- Modal for reset confirmation -->
+  <div id="resetModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="resetTitle" hidden>
+    <div class="modal-header">
+      <h3 id="resetTitle" style="margin:0; font-size:18px">Reset All?</h3>
+    </div>
+    <div class="modal-body">
+      <div class="notice" style="font-weight:600">This clears attendees, teams, results, and rounds.</div>
+    </div>
+    <div class="modal-actions">
+      <button id="resetCancel" type="button" class="btn">Cancel</button>
+      <button id="resetConfirm" type="button" class="btn danger">Reset</button>
+    </div>
+  </div>
+
   <script>
     // ----- Data & Storage -----
     const DEFAULT_PLAYERS = [
@@ -314,17 +347,17 @@
       Aklilu: 4,
       Aron: 2,
       Aurant: 2,
-      Bas: 4,
+      Bas: 5,
       Bjorn: 4,
       Danny: 3,
       David: 3,
       Hanno: 5,
-      Jefta: 3,
+      Jefta: 4,
       Lenn: 4,
       Nathan: 3,
       Rene: 4,
       Sem: 5,
-      Timo: 3,
+      Timo: 4,
       Wijnand: 3,
       Willem: 4,
       Amir: 4,
@@ -435,15 +468,36 @@
       document.getElementById('countNot').textContent = `(${notPlaying.length})`;
       document.getElementById('countPlay').textContent = `(${state.attendees.length}/16)`;
 
-      const canGen = state.attendees.length >= 8;
+      const hasTeams = state.teams && state.teams.length>0;
+      const canGen = state.attendees.length >= 8 && !hasTeams;
       document.getElementById('btnGenerateBottom').disabled = !canGen;
+      const addBtn = document.getElementById('btnAddPlayer');
+      if(addBtn) addBtn.disabled = !!hasTeams;
+      const info = document.getElementById('genError');
+      if(hasTeams){
+        info.classList.remove('error');
+        info.style.display = '';
+        info.textContent = 'Players are locked because teams are generated. Tap Reset to start over.';
+      } else {
+        info.textContent = '';
+        info.style.display = 'none';
+      }
+      const sec = document.getElementById('playersSection');
+      sec.classList.toggle('locked', !!hasTeams);
+      const banner = document.getElementById('playersLockedMsg');
+      if(hasTeams){
+        banner.textContent = 'Players are locked — teams have been generated. Tap Reset to start over.';
+      } else {
+        banner.textContent = '';
+      }
     }
 
     function createListItem(name, isPlaying){
       const div = document.createElement('div');
       div.className = 'item';
       div.setAttribute('role','listitem');
-      div.setAttribute('draggable','true');
+      const locked = state.teams && state.teams.length>0;
+      div.setAttribute('draggable', locked ? 'false' : 'true');
       div.dataset.name = name;
       div.dataset.side = isPlaying ? 'playing' : 'not';
 
@@ -451,7 +505,8 @@
       btn.type = 'button';
       btn.className = 'move';
       btn.ariaLabel = (isPlaying? 'Remove ' : 'Add ') + name + (isPlaying? ' from Playing' : ' to Playing');
-      btn.title = isPlaying? 'Move back' : 'Move to Playing';
+      btn.title = (locked ? 'Teams are generated. Reset to change players.' : (isPlaying? 'Move back' : 'Move to Playing'));
+      if(locked) btn.disabled = true;
       btn.textContent = isPlaying ? '←' : '→';
 
       const label = document.createElement('div');
@@ -461,6 +516,7 @@
       // Click anywhere on item toggles
       div.tabIndex = 0;
       const onToggle = () => {
+        if(state.teams && state.teams.length>0) return; // locked
         if(isPlaying){ moveToNot(name); } else { moveToPlay(name); }
       };
       div.addEventListener('click', (e)=>{
@@ -474,6 +530,7 @@
 
       // Drag & drop
       div.addEventListener('dragstart', (e)=>{
+        if(state.teams && state.teams.length>0){ e.preventDefault(); return; }
         e.dataTransfer.setData('text/plain', name);
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('application/x-side', isPlaying ? 'playing' : 'not');
@@ -489,9 +546,10 @@
       const listPlay = document.getElementById('listPlay');
       const zones = [listNot, listPlay];
       for(const z of zones){
-        z.addEventListener('dragover', (e)=>{ e.preventDefault(); z.classList.add('droptarget'); });
+        z.addEventListener('dragover', (e)=>{ if(state.teams && state.teams.length>0) return; e.preventDefault(); z.classList.add('droptarget'); });
         z.addEventListener('dragleave', ()=> z.classList.remove('droptarget'));
         z.addEventListener('drop', (e)=>{
+          if(state.teams && state.teams.length>0) return;
           e.preventDefault(); z.classList.remove('droptarget');
           const name = e.dataTransfer.getData('text/plain');
           const from = e.dataTransfer.getData('application/x-side');
@@ -592,13 +650,61 @@
 
           const label = document.createElement('div');
           label.style.flex = '1 1 220px';
-          label.textContent = `${a.name} vs ${b.name}`;
+          label.style.display = 'flex';
+          label.style.alignItems = 'center';
+          label.style.gap = '8px';
+          label.style.flexWrap = 'wrap';
+          const teamABox = document.createElement('div');
+          teamABox.style.display = 'flex';
+          teamABox.style.flexDirection = 'column';
+          teamABox.style.alignItems = 'flex-start';
+          const pillA = document.createElement('span');
+          pillA.className = 'team-pill';
+          pillA.style.borderColor = a.color;
+          pillA.appendChild(document.createTextNode(a.name));
+          const subA = document.createElement('div');
+          subA.className = 'team-sub';
+          subA.textContent = (a.members || []).join(', ');
+          teamABox.appendChild(pillA);
+          teamABox.appendChild(subA);
+          const vs = document.createElement('span');
+          vs.textContent = 'vs';
+          vs.style.color = 'var(--muted)';
+          vs.style.fontWeight = '700';
+          const teamBBox = document.createElement('div');
+          teamBBox.style.display = 'flex';
+          teamBBox.style.flexDirection = 'column';
+          teamBBox.style.alignItems = 'flex-start';
+          const pillB = document.createElement('span');
+          pillB.className = 'team-pill';
+          pillB.style.borderColor = b.color;
+          pillB.appendChild(document.createTextNode(b.name));
+          const subB = document.createElement('div');
+          subB.className = 'team-sub';
+          subB.textContent = (b.members || []).join(', ');
+          teamBBox.appendChild(pillB);
+          teamBBox.appendChild(subB);
+          label.appendChild(teamABox);
+          label.appendChild(vs);
+          label.appendChild(teamBBox);
 
           const score = document.createElement('div');
           score.style.minWidth = '90px';
           score.style.fontWeight = '600';
-          score.style.color = rec && rec.ga != null && rec.gb != null ? '#111827' : 'var(--muted)';
-          score.textContent = rec && rec.ga != null && rec.gb != null ? `${rec.ga} - ${rec.gb}` : 'No result';
+          const isPlayed = rec && rec.ga != null && rec.gb != null;
+          score.style.color = isPlayed ? '#111827' : 'var(--muted)';
+          score.textContent = isPlayed ? `${rec.ga} - ${rec.gb}` : '';
+          if(isPlayed){ row.classList.add('played'); }
+          // Winner styling: solid team-color pill with white text
+          if(isPlayed){
+            if(rec.ga > rec.gb){
+              pillA.classList.add('winner');
+              pillA.style.background = a.color; pillA.style.borderColor = a.color; pillA.style.color = '#fff';
+            } else if(rec.gb > rec.ga){
+              pillB.classList.add('winner');
+              pillB.style.background = b.color; pillB.style.borderColor = b.color; pillB.style.color = '#fff';
+            }
+          }
 
           const btn = document.createElement('button');
           btn.type = 'button';
@@ -642,7 +748,7 @@
       lb.appendChild(title);
 
       // Compute points per team
-      const byId = new Map(state.teams.map(t => [t.id, { team: t, pts: 0, played: 0, gf: 0 }]));
+      const byId = new Map(state.teams.map(t => [t.id, { team: t, pts: 0, played: 0, gf: 0, ga: 0 }]));
       for(const key of Object.keys(state.results || {})){
         const r = state.results[key];
         if(!r) continue;
@@ -652,6 +758,7 @@
         if(!A || !B) continue;
         A.played++; B.played++;
         A.gf += ga; B.gf += gb;
+        A.ga += gb; B.ga += ga;
         if(ga > gb){ A.pts += 3; }
         else if(gb > ga){ B.pts += 3; }
         else { A.pts += 1; B.pts += 1; }
@@ -675,18 +782,31 @@
       wrap.style.overflow = 'auto';
       const table = document.createElement('table');
       const thead = document.createElement('thead');
-      thead.innerHTML = '<tr><th style="width:50%">Team</th><th>Played</th><th>Points</th><th>Goals</th></tr>';
+      thead.innerHTML = '<tr><th style="width:50%">Team</th><th>Played</th><th class="sorted" title="Sorted by points (desc)">Points</th><th>GD</th></tr>';
       const tbody = document.createElement('tbody');
       for(const r of rows){
         const tr = document.createElement('tr');
         const tdTeam = document.createElement('td');
-        tdTeam.textContent = r.team.name;
+        const pill = document.createElement('span');
+        pill.className = 'team-pill';
+        pill.style.borderColor = r.team.color;
+        const label = document.createElement('span');
+        label.textContent = r.team.name;
+        pill.appendChild(label);
+        tdTeam.appendChild(pill);
+        const membersSmall = document.createElement('div');
+        membersSmall.className = 'team-sub';
+        membersSmall.textContent = r.team.members.join(', ');
+        tdTeam.appendChild(membersSmall);
         const tdPlayed = document.createElement('td');
         tdPlayed.textContent = String(r.played);
         const tdPts = document.createElement('td');
         tdPts.textContent = String(r.pts);
         const tdG = document.createElement('td');
-        tdG.textContent = String(r.gf);
+        const gd = (r.gf - (r.ga || 0));
+        tdG.textContent = String(gd);
+        if(gd > 0) tdG.classList.add('gd-pos');
+        else if(gd < 0) tdG.classList.add('gd-neg');
         tr.appendChild(tdTeam); tr.appendChild(tdPlayed); tr.appendChild(tdPts); tr.appendChild(tdG);
         tbody.appendChild(tr);
       }
@@ -718,8 +838,27 @@
       const label = document.getElementById('modalMatchLabel');
       const saveBtn = document.getElementById('modalSave');
 
-      aName.textContent = a.name;
-      bName.textContent = b.name;
+      // Render team pills in modal
+      aName.textContent = '';
+      bName.textContent = '';
+      const pillA = document.createElement('span');
+      pillA.className = 'team-pill';
+      pillA.style.borderColor = a.color;
+      pillA.appendChild(document.createTextNode(a.name));
+      const pillB = document.createElement('span');
+      pillB.className = 'team-pill';
+      pillB.style.borderColor = b.color;
+      pillB.appendChild(document.createTextNode(b.name));
+      aName.appendChild(pillA);
+      const subA = document.createElement('div');
+      subA.className = 'team-sub';
+      subA.textContent = (a.members || []).join(', ');
+      aName.appendChild(subA);
+      bName.appendChild(pillB);
+      const subB = document.createElement('div');
+      subB.className = 'team-sub';
+      subB.textContent = (b.members || []).join(', ');
+      bName.appendChild(subB);
       label.textContent = `${a.name} vs ${b.name} • Round ${round}`;
 
       const existing = state.results[matchId];
@@ -759,8 +898,6 @@
         closeResultModal();
         renderSchedule();
         renderLeaderboard();
-        // Always take user to the Leaderboard after saving a result
-        switchTab('leaderboard');
         if(areAllMatchesScored() && !state.celebrated){
           switchTab('leaderboard');
           celebrateWinner();
@@ -829,6 +966,25 @@
     function closeAddPlayerModal(){
       const overlay = document.getElementById('overlay');
       const modal = document.getElementById('addPlayerModal');
+      overlay.hidden = true; modal.hidden = true;
+    }
+
+    // ----- Modal: Reset Confirmation -----
+    function openResetModal(){
+      const overlay = document.getElementById('overlay');
+      const modal = document.getElementById('resetModal');
+      const cancel = document.getElementById('resetCancel');
+      const confirm = document.getElementById('resetConfirm');
+
+      overlay.hidden = false; modal.hidden = false;
+      overlay.onclick = closeResetModal;
+      cancel.onclick = closeResetModal;
+      confirm.onclick = () => { closeResetModal(); resetAll(); };
+      document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ closeResetModal(); } }, { once:true });
+    }
+    function closeResetModal(){
+      const overlay = document.getElementById('overlay');
+      const modal = document.getElementById('resetModal');
       overlay.hidden = true; modal.hidden = true;
     }
 
@@ -1024,6 +1180,7 @@
       saveResults();
       saveRounds();
       renderTeams();
+      renderRoster();
       renderSchedule();
       renderLeaderboard();
       switchTab('teams');
@@ -1048,7 +1205,7 @@
 
     // ----- Wire up -----
     document.getElementById('btnGenerateBottom').addEventListener('click', generateTeams);
-    document.getElementById('btnReset').addEventListener('click', resetAll);
+    document.getElementById('btnReset').addEventListener('click', openResetModal);
     // Copy button removed from UI
     document.getElementById('btnAddPlayer').addEventListener('click', openAddPlayerModal);
 
@@ -1080,6 +1237,9 @@
       }
       for(const [k,el] of Object.entries(panels)){
         el.hidden = k !== which;
+      }
+      if(which === 'players'){
+        renderRoster(); // ensure lock state reflected immediately
       }
     }
     function updateTabsUI(){
