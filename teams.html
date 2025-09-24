@@ -123,6 +123,10 @@
       .actions .btn.primary{flex:1}
       .panel{border-radius:12px}
       .item{border-radius:12px}
+      /* Toned-down steppers on mobile */
+      .btn.step{ min-width:44px; min-height:44px; font-size:22px }
+      .score-input{ width:64px !important; min-height:44px; font-size:20px }
+      .modal .score-stepper{ gap:8px }
     }
 
     /* Modal */
@@ -244,7 +248,7 @@
           <div class="score-stepper">
             <button id="modalATeamMinus" class="btn step" type="button" aria-label="Decrease goals">−</button>
             <input id="modalTeamAScore" class="score-input" type="number" inputmode="numeric" min="0" placeholder="0" aria-label="Team A goals" />
-            <button id="modalATeamPlus" class="btn step" type="button" aria-label="Increase goals">+</nbutton>
+            <button id="modalATeamPlus" class="btn step" type="button" aria-label="Increase goals">+</button>
           </div>
         </label>
         <label class="score-row">
@@ -298,7 +302,7 @@
 
     // Skill levels (0-5). Adjust in code here when needed.
     const SKILLS = {
-      Ruben: 3,
+      Ruben: 4,
       Job: 4,
       Ramtin: 2,
       Thijs: 5,
@@ -514,9 +518,6 @@
         const pill = document.createElement('span');
         pill.className = 'team-pill';
         pill.style.borderColor = team.color;
-        const sw = document.createElement('span');
-        sw.className = 'pill-swatch';
-        sw.style.background = team.color;
         const nameSpan = document.createElement('span');
         nameSpan.className = 'team-name';
         nameSpan.contentEditable = 'true';
@@ -532,7 +533,6 @@
           saveTeams();
           renderSchedule();
         });
-        pill.appendChild(sw);
         pill.appendChild(nameSpan);
         tdTeam.appendChild(pill);
 
