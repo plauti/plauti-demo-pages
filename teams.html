@@ -117,6 +117,7 @@
     .schedule{margin-top:16px}
     .pair{padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:#ffffff; margin-top:8px}
     .pair.played{ opacity:.6 }
+    .match-score{ text-align:right; margin-left:auto; display:flex; align-items:center; justify-content:flex-end; gap:8px }
     /* Breathing room under panel headers in Players tab */
     #playersSection .panel > div:first-child{ margin-bottom: 10px }
 
@@ -669,10 +670,7 @@
           subA.textContent = (a.members || []).join(', ');
           teamABox.appendChild(pillA);
           teamABox.appendChild(subA);
-          const vs = document.createElement('span');
-          vs.textContent = 'vs';
-          vs.style.color = 'var(--muted)';
-          vs.style.fontWeight = '700';
+          // Removed explicit 'vs' label for cleaner layout
           const teamBBox = document.createElement('div');
           teamBBox.style.display = 'flex';
           teamBBox.style.flexDirection = 'column';
@@ -687,15 +685,15 @@
           teamBBox.appendChild(pillB);
           teamBBox.appendChild(subB);
           label.appendChild(teamABox);
-          label.appendChild(vs);
           label.appendChild(teamBBox);
 
           const score = document.createElement('div');
+          score.className = 'match-score';
           score.style.minWidth = '90px';
           score.style.fontWeight = '600';
           const isPlayed = rec && rec.ga != null && rec.gb != null;
           score.style.color = isPlayed ? '#111827' : 'var(--muted)';
-          score.textContent = isPlayed ? `${rec.ga} - ${rec.gb}` : '';
+          score.textContent = '';
           if(isPlayed){ row.classList.add('played'); }
           // Winner styling: solid team-color pill with white text
           if(isPlayed){
@@ -708,15 +706,25 @@
             }
           }
 
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'btn';
-          btn.textContent = rec && rec.ga != null && rec.gb != null ? 'Edit Result' : 'Set Result';
-          btn.addEventListener('click', ()=> openResultModal({ matchId, a, b, round: roundIdx+1 }));
+          // Button handling: show score as a button when played; otherwise show Set Result
+          if(isPlayed){
+            const scoreBtn = document.createElement('button');
+            scoreBtn.type = 'button';
+            scoreBtn.className = 'btn slim';
+            scoreBtn.textContent = `${rec.ga} - ${rec.gb}`;
+            scoreBtn.addEventListener('click', ()=> openResultModal({ matchId, a, b, round: roundIdx+1 }));
+            score.appendChild(scoreBtn);
+          } else {
+            const setBtn = document.createElement('button');
+            setBtn.type = 'button';
+            setBtn.className = 'btn slim';
+            setBtn.textContent = 'Set Result';
+            setBtn.addEventListener('click', ()=> openResultModal({ matchId, a, b, round: roundIdx+1 }));
+            score.appendChild(setBtn);
+          }
 
           row.appendChild(label);
           row.appendChild(score);
-          row.appendChild(btn);
           list.appendChild(row);
         });
       }
