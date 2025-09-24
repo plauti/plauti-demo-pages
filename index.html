@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Futsal Team Generator X9000</title>
+  <style>
+    :root{
+      --bg:#ffffff;
+      --panel:#ffffff;
+      --muted:#6b7280; /* gray-500 */
+      --text:#111827;  /* gray-900 */
+      --accent:#2563eb; /* blue-600 */
+      --accent-2:#059669; /* emerald-600 */
+      --danger:#dc2626; /* red-600 */
+      --warn:#b45309;   /* amber-700 */
+      --border:#e5e7eb; /* gray-200 */
+      --focus:#2563eb;  /* blue-600 */
+    }
+    /* Ensure hidden attribute truly hides on all browsers */
+    [hidden]{ display:none !important }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;
+      background: radial-gradient(1200px 800px at 10% 10%, #e5f0ff 0%, #f8fafc 60%);
+      color:var(--text);
+    }
+    header{
+      display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
+      gap:12px; padding:18px 20px; border-bottom:1px solid var(--border);
+      background:linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
+      backdrop-filter: blur(6px);
+      position:sticky; top:0; z-index:2;
+    }
+    header h1{margin:0; font-size:20px; letter-spacing:.2px}
+    .btn{
+      appearance:none; border:1px solid #d1d5db; background:#ffffff; color:#111827;
+      padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600; letter-spacing:.2px;
+      box-shadow: 0 1px 1px rgba(0,0,0,.04);
+      min-height:44px; font-size:16px; line-height:1.2;
+      touch-action: manipulation;
+    }
+    .btn:hover{border-color:#9ca3af; background:#f9fafb}
+    .btn[disabled]{opacity:.6; cursor:not-allowed}
+    .btn.primary{background:linear-gradient(180deg, #3b82f6, #2563eb); border-color:#2563eb; color:#fff}
+    .btn.danger{background:linear-gradient(180deg, #ef4444, #dc2626); border-color:#b91c1c; color:#fff}
+    .btn.secondary{background:#f3f4f6}
+
+    main{padding:18px 20px; max-width:1100px; margin:0 auto}
+
+    /* Tabs */
+    .tabs{
+      position:sticky; top:62px; z-index:2; /* under header */
+      display:flex; gap:8px; padding:8px 12px; border-bottom:1px solid var(--border);
+      background:linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.9));
+      backdrop-filter: blur(6px);
+    }
+    .tab{
+      flex:1; min-height:44px; padding:10px 12px; border-radius:999px; border:1px solid var(--border);
+      background:#fff; color:#111827; font-weight:600; cursor:pointer;
+    }
+    .tab.active{ border-color:#2563eb; color:#0b3aa8; box-shadow: inset 0 0 0 1px #2563eb }
+    .tab[disabled]{ opacity:.5; cursor:not-allowed }
+
+    .picker{
+      display:grid; grid-template-columns:1fr; gap:16px; align-items:start;
+    }
+    @media (min-width: 900px){
+      .picker{grid-template-columns:1fr 1fr}
+    }
+    .panel{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px}
+    .panel h2{margin:0 0 8px 0; font-size:14px; color:var(--muted); font-weight:700; text-transform:uppercase}
+    .counts{font-size:12px; color:var(--muted)}
+
+    .search{
+      width:100%; margin:8px 0 10px 0; padding:12px 12px; border-radius:10px; border:1px solid #d1d5db;
+      background:#ffffff; color:var(--text); font-size:16px; min-height:44px;
+    }
+    .lists{display:flex; flex-direction:column; gap:8px; max-height:360px; overflow:auto; padding:2px; -webkit-overflow-scrolling:touch; overscroll-behavior:contain}
+    .item{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border:1px solid var(--border); border-radius:10px; background:#ffffff; min-height:44px}
+    .item button{background:transparent; color:#6b7280; border:none; padding:6px; cursor:pointer; font-size:18px}
+    .item button:hover{color:#111827}
+    .item[draggable="true"]{cursor:grab}
+    .item:focus-visible{outline:2px solid var(--focus); outline-offset:2px}
+    .droptarget{outline:2px dashed var(--accent); outline-offset:-4px}
+
+    .notice{margin-top:6px; color:var(--muted); font-size:12px}
+    .error{color:var(--danger)}
+
+    .actions{display:flex; gap:8px; align-items:center; justify-content:flex-end; margin:12px 0}
+
+    .teams{margin-top:20px}
+    .teams header{display:flex; justify-content:space-between; align-items:center; gap:8px; padding:0; border:0; background:transparent; position:static}
+    table{width:100%; border-collapse:collapse; overflow:hidden; border-radius:12px; border:1px solid var(--border); background:#fff}
+    th, td{padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:top}
+    th{font-size:12px; color:var(--muted); text-transform:uppercase; text-align:left}
+    tbody tr:last-child td{border-bottom:none}
+    .swatch{width:16px; height:16px; border-radius:50%; display:inline-block; border:1px solid rgba(0,0,0,.15)}
+    .team-name[contenteditable="true"]{padding:2px 6px; border-radius:6px}
+    .team-name[contenteditable="true"]:focus{outline:2px solid var(--focus)}
+    .team-pill{ display:inline-flex; align-items:center; gap:8px; padding:4px 8px; border-radius:999px; border:1px solid #e5e7eb; background:#fff; }
+    .team-pill .pill-swatch{ width:14px; height:14px; border-radius:50%; border:1px solid rgba(0,0,0,.15); display:inline-block }
+
+    .schedule{margin-top:16px}
+    .pair{padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:#ffffff; margin-top:8px}
+
+    footer{margin:24px 0; color:var(--muted); font-size:12px}
+
+    /* Mobile optimizations */
+    @media (max-width: 899px){
+      header{padding:14px 12px}
+      .tabs{ top:54px; padding:6px 8px }
+      main{padding:14px 12px}
+      .lists{max-height:40vh}
+      .actions{
+        position: sticky; bottom: env(safe-area-inset-bottom, 0px);
+        background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,0.95));
+        border-top:1px solid var(--border);
+        padding:10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
+        margin-left:-8px; margin-right:-8px;
+      }
+      .actions .btn.primary{flex:1}
+      .panel{border-radius:12px}
+      .item{border-radius:12px}
+    }
+
+    /* Modal */
+    .modal-overlay[hidden], .modal[hidden]{ display:none }
+    .modal-overlay{
+      position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 50;
+      backdrop-filter: blur(2px);
+    }
+    .modal{
+      position: fixed; z-index: 51; left:50%; top: 10vh; transform: translateX(-50%);
+      width: min(92vw, 480px); background: #fff; border:1px solid var(--border); border-radius:12px;
+      box-shadow: 0 20px 40px rgba(0,0,0,.12);
+    }
+    .modal .modal-header{ padding:14px 16px; border-bottom:1px solid var(--border)}
+    .modal .modal-body{ padding:14px 16px}
+    .modal .modal-actions{ display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid var(--border)}
+    .modal .modal-fields{ display:grid; grid-template-columns:1fr; gap:12px }
+    .modal .modal-fields label{ display:flex; align-items:center; justify-content:space-between; gap:12px }
+    /* In modals, keep numeric inputs compact but text inputs full-width */
+    .modal .modal-fields input[type="number"]{ width:100px }
+    .modal .modal-fields input[type="text"],
+    .modal .modal-fields input[type="search"]{ width:100% }
+    .modal .score-row{ display:grid; grid-template-columns:1fr auto; align-items:center; gap:12px }
+    .modal .score-stepper{ display:flex; align-items:center; gap:10px }
+    .btn.step{ min-width:56px; min-height:56px; border-radius:12px; font-size:28px; padding:0 0; line-height:1; display:inline-flex; align-items:center; justify-content:center }
+    .score-input{ width:88px !important; min-height:56px; text-align:center; font-size:24px; border:1px solid #d1d5db; border-radius:10px; background:#fff; color:#111827 }
+
+    /* Toast & Confetti */
+    .toast{
+      position: fixed; left:50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+      background: #fff; color:#111827; border:1px solid #e5e7eb; border-radius:14px; padding:12px 16px; z-index:60;
+      box-shadow: 0 10px 30px rgba(0,0,0,.15); font-weight:700; display:flex; gap:10px; align-items:center;
+    }
+    .toast .emoji{ font-size:22px }
+    .toast.winner{ font-size:22px; padding:16px 20px; border-width:2px }
+    .winner-banner{ font-size:28px; font-weight:800; text-align:center; color:#111827; letter-spacing:.5px; margin:8px 0 12px }
+    .confetti{ position: fixed; top:-10px; width:8px; height:14px; opacity:.9; z-index:55; pointer-events:none }
+    @keyframes confetti-fall{ from{ transform: translateY(-10vh) rotate(0deg)} to{ transform: translateY(110vh) rotate(360deg)} }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Futsal Team Generator X9000</h1>
+    <div style="display:flex; gap:8px; align-items:center">
+      <button class="btn danger" id="btnReset" aria-label="Reset all match data">Reset</button>
+    </div>
+  </header>
+  <nav class="tabs" role="tablist" aria-label="Futsal sections">
+    <button id="tabPlayers" class="tab active" role="tab" aria-selected="true" aria-controls="playersSection">Players</button>
+    <button id="tabTeams" class="tab" role="tab" aria-selected="false" aria-controls="teamsSection" disabled>Teams</button>
+    <button id="tabMatches" class="tab" role="tab" aria-selected="false" aria-controls="matchesSection">Matches</button>
+    <button id="tabLeaderboard" class="tab" role="tab" aria-selected="false" aria-controls="leaderboardSection">Leaderboard</button>
+  </nav>
+  <main>
+    <section id="playersSection" class="picker" role="tabpanel" aria-labelledby="tabPlayers">
+      <div class="panel" aria-labelledby="available-title">
+        <div style="display:flex; justify-content:space-between; align-items:end; gap:8px">
+          <h2 id="available-title">Available Players <span class="counts" id="countNot">(0)</span></h2>
+          <button id="btnAddPlayer" class="btn" type="button" aria-label="Add incidental player">Add player</button>
+        </div>
+        <div id="listNot" class="lists" role="list" aria-label="Available players list"></div>
+      </div>
+
+      <div class="panel" aria-labelledby="playing-title">
+        <div style="display:flex; justify-content:space-between; align-items:end; gap:8px">
+          <h2 id="playing-title">Playing Today <span class="counts" id="countPlay">(0/16)</span></h2>
+        </div>
+        <div id="listPlay" class="lists" role="list" aria-label="Playing list"></div>
+        <div id="limitNotice" class="notice" role="status" aria-live="polite" style="display:none">Limit reached: maximum 16 attendees.</div>
+      </div>
+      <div class="actions" id="playersActions">
+        <div id="genError" class="notice error" role="alert" style="margin-right:auto; display:none"></div>
+        <button class="btn primary" id="btnGenerateBottom" aria-label="Generate balanced teams (bottom)" disabled>Generate Teams</button>
+      </div>
+    </section>
+
+    <section class="teams" id="teamsSection" role="tabpanel" aria-labelledby="tabTeams" hidden>
+      <header>
+        <h2 style="margin:0">Teams</h2>
+      </header>
+      <div style="overflow:auto">
+        <table aria-label="Teams table" id="teamsTable">
+          <thead>
+            <tr>
+              <th>Team</th>
+              <th>Members</th>
+              <th>Size</th>
+            </tr>
+          </thead>
+          <tbody id="teamsBody"></tbody>
+        </table>
+      </div>
+
+    </section>
+
+    <section class="schedule" id="matchesSection" role="tabpanel" aria-labelledby="tabMatches" hidden>
+      <h2 style="margin:0 0 8px 0">Matches</h2>
+      <div id="matchesList"></div>
+    </section>
+
+    <section id="leaderboardSection" role="tabpanel" aria-labelledby="tabLeaderboard" hidden>
+      <!-- Leaderboard content rendered by JS -->
+    </section>
+
+    
+  </main>
+
+  <!-- Modal for setting match results -->
+  <div id="overlay" class="modal-overlay" hidden></div>
+  <div id="resultModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
+    <div class="modal-header">
+      <h3 id="modalTitle" style="margin:0; font-size:18px">Set Result</h3>
+    </div>
+    <div class="modal-body">
+      <div id="modalMatchLabel" class="notice" style="margin-bottom:8px"></div>
+      <div class="modal-fields">
+        <label class="score-row">
+          <span id="modalTeamAName" style="min-width:120px"></span>
+          <div class="score-stepper">
+            <button id="modalATeamMinus" class="btn step" type="button" aria-label="Decrease goals">−</button>
+            <input id="modalTeamAScore" class="score-input" type="number" inputmode="numeric" min="0" placeholder="0" aria-label="Team A goals" />
+            <button id="modalATeamPlus" class="btn step" type="button" aria-label="Increase goals">+</nbutton>
+          </div>
+        </label>
+        <label class="score-row">
+          <span id="modalTeamBName" style="min-width:120px"></span>
+          <div class="score-stepper">
+            <button id="modalBTeamMinus" class="btn step" type="button" aria-label="Decrease goals">−</button>
+            <input id="modalTeamBScore" class="score-input" type="number" inputmode="numeric" min="0" placeholder="0" aria-label="Team B goals" />
+            <button id="modalBTeamPlus" class="btn step" type="button" aria-label="Increase goals">+</button>
+          </div>
+        </label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button id="modalCancel" type="button" class="btn">Cancel</button>
+      <button id="modalSave" type="button" class="btn primary" disabled>Save</button>
+    </div>
+  </div>
+
+  <!-- Modal for adding incidental player -->
+  <div id="addPlayerModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="addPlayerTitle" hidden>
+    <div class="modal-header">
+      <h3 id="addPlayerTitle" style="margin:0; font-size:18px">Add Player</h3>
+    </div>
+    <div class="modal-body">
+      <div class="modal-fields">
+        <label style="flex-direction:column; align-items:stretch">
+          <span class="notice" style="margin:0 0 6px 0">Enter a name that is not on the roster</span>
+          <input id="addPlayerName" class="search" type="text" placeholder="Full name" aria-label="Player name" />
+        </label>
+        <div id="addPlayerError" class="notice error" style="display:none"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button id="addPlayerCancel" type="button" class="btn">Cancel</button>
+      <button id="addPlayerSave" type="button" class="btn primary" disabled>Save</button>
+    </div>
+  </div>
+
+  <script>
+    // ----- Data & Storage -----
+    const DEFAULT_PLAYERS = [
+      "Ruben","Job","Ramtin","Thijs","Emiel","Frits","Gerjan","Wout","Aklilu","Aron","Aurant","Bas","Bjorn","Danny","David","Hanno","Jefta","Lenn","Nathan","Rene","Sem","Timo","Wijnand","Willem","Amir"
+    ];
+
+    const COLORS = [
+      { name: "Red",   hex: "#EF4444" },
+      { name: "Blue",  hex: "#3B82F6" },
+      { name: "Green", hex: "#10B981" },
+      { name: "Yellow",hex: "#F59E0B" },
+    ];
+
+    // Skill levels (0-5). Adjust in code here when needed.
+    const SKILLS = {
+      Ruben: 3,
+      Job: 4,
+      Ramtin: 2,
+      Thijs: 5,
+      Emiel: 4,
+      Frits: 3,
+      Gerjan: 3,
+      Wout: 3,
+      Aklilu: 4,
+      Aron: 2,
+      Aurant: 2,
+      Bas: 5,
+      Bjorn: 4,
+      Danny: 3,
+      David: 3,
+      Hanno: 5,
+      Jefta: 4,
+      Lenn: 4,
+      Nathan: 3,
+      Rene: 4,
+      Sem: 5,
+      Timo: 4,
+      Wijnand: 3,
+      Willem: 4,
+      Amir: 4,
+    };
+    const DEFAULT_SKILL = 3; // for incidental players
+    const getSkill = (name) => (typeof SKILLS[name] === 'number' ? SKILLS[name] : DEFAULT_SKILL);
+
+    const KEYS = {
+      players: 'futsal.players',
+      attendees: 'futsal.match.attendees',
+      teams: 'futsal.match.teams',
+      timestamp: 'futsal.match.timestamp',
+      results: 'futsal.match.results',
+      rounds: 'futsal.match.rounds'
+    };
+
+    const state = {
+      players: [],
+      attendees: [],
+      teams: [],
+      timestamp: null,
+      results: {}, // matchId -> {a:idA, b:idB, round:1..N, ga:number|null, gb:number|null}
+      rounds: 2,
+      celebrated: false
+    };
+
+    function loadState(){
+      const p = localStorage.getItem(KEYS.players);
+      if(!p){
+        localStorage.setItem(KEYS.players, JSON.stringify(DEFAULT_PLAYERS));
+        state.players = [...DEFAULT_PLAYERS];
+      } else {
+        try{ state.players = JSON.parse(p) || []; }catch{ state.players = [...DEFAULT_PLAYERS]; }
+      }
+
+      try{ state.attendees = JSON.parse(localStorage.getItem(KEYS.attendees) || '[]'); }catch{ state.attendees = []; }
+      try{ state.teams = JSON.parse(localStorage.getItem(KEYS.teams) || '[]'); }catch{ state.teams = []; }
+      const ts = localStorage.getItem(KEYS.timestamp);
+      state.timestamp = ts ? Number(ts) : null;
+      try{ state.results = JSON.parse(localStorage.getItem(KEYS.results) || '{}'); }catch{ state.results = {}; }
+      const rd = localStorage.getItem(KEYS.rounds);
+      state.rounds = rd ? Math.max(1, parseInt(rd, 10) || 2) : 2;
+    }
+
+    function saveAttendees(){ localStorage.setItem(KEYS.attendees, JSON.stringify(state.attendees)); }
+    function saveTeams(){ localStorage.setItem(KEYS.teams, JSON.stringify(state.teams)); }
+    function saveTimestamp(){ if(state.timestamp) localStorage.setItem(KEYS.timestamp, String(state.timestamp)); }
+    function saveResults(){ localStorage.setItem(KEYS.results, JSON.stringify(state.results)); }
+    function saveRounds(){ localStorage.setItem(KEYS.rounds, String(state.rounds)); }
+
+    // ----- Utilities -----
+    function mulberry32(a){
+      return function(){
+        let t = a += 0x6D2B79F5;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      }
+    }
+
+    function shuffleSeeded(arr, seed){
+      const rng = mulberry32(seed >>> 0);
+      const a = [...arr];
+      for(let i=a.length-1;i>0;i--){
+        const j = Math.floor(rng() * (i+1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function clampPlayLimit(){
+      const over = state.attendees.length > 16;
+      if(over){
+        state.attendees = state.attendees.slice(0,16);
+        saveAttendees();
+      }
+      const notice = document.getElementById('limitNotice');
+      if(state.attendees.length >= 16){
+        notice.style.display = '';
+      } else {
+        notice.style.display = 'none';
+      }
+    }
+
+    // ----- Rendering -----
+    function renderRoster(){
+      const listNot = document.getElementById('listNot');
+      const listPlay = document.getElementById('listPlay');
+      listNot.innerHTML = ''; listPlay.innerHTML='';
+
+      const playSet = new Set(state.attendees);
+      const notPlaying = state.players
+        .filter(p => !playSet.has(p))
+        .sort((a,b)=> a.localeCompare(b, undefined, { sensitivity: 'base' }));
+      const notFiltered = notPlaying;
+
+      // Available players list
+      for(const name of notFiltered){
+        const item = createListItem(name, false);
+        listNot.appendChild(item);
+      }
+      // Playing list
+      for(const name of state.attendees){
+        const item = createListItem(name, true);
+        listPlay.appendChild(item);
+      }
+
+      document.getElementById('countNot').textContent = `(${notPlaying.length})`;
+      document.getElementById('countPlay').textContent = `(${state.attendees.length}/16)`;
+
+      const canGen = state.attendees.length >= 8;
+      document.getElementById('btnGenerateBottom').disabled = !canGen;
+    }
+
+    function createListItem(name, isPlaying){
+      const div = document.createElement('div');
+      div.className = 'item';
+      div.setAttribute('role','listitem');
+      div.setAttribute('draggable','true');
+      div.dataset.name = name;
+      div.dataset.side = isPlaying ? 'playing' : 'not';
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'move';
+      btn.ariaLabel = (isPlaying? 'Remove ' : 'Add ') + name + (isPlaying? ' from Playing' : ' to Playing');
+      btn.title = isPlaying? 'Move back' : 'Move to Playing';
+      btn.textContent = isPlaying ? '←' : '→';
+
+      const label = document.createElement('div');
+      label.textContent = name;
+      label.style.flex = '1';
+
+      // Click anywhere on item toggles
+      div.tabIndex = 0;
+      const onToggle = () => {
+        if(isPlaying){ moveToNot(name); } else { moveToPlay(name); }
+      };
+      div.addEventListener('click', (e)=>{
+        if(e.target === btn) return; // button handles its own
+        onToggle();
+      });
+      div.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); onToggle(); }
+      });
+      btn.addEventListener('click', onToggle);
+
+      // Drag & drop
+      div.addEventListener('dragstart', (e)=>{
+        e.dataTransfer.setData('text/plain', name);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('application/x-side', isPlaying ? 'playing' : 'not');
+      });
+
+      div.appendChild(label);
+      div.appendChild(btn);
+      return div;
+    }
+
+    function setupDnD(){
+      const listNot = document.getElementById('listNot');
+      const listPlay = document.getElementById('listPlay');
+      const zones = [listNot, listPlay];
+      for(const z of zones){
+        z.addEventListener('dragover', (e)=>{ e.preventDefault(); z.classList.add('droptarget'); });
+        z.addEventListener('dragleave', ()=> z.classList.remove('droptarget'));
+        z.addEventListener('drop', (e)=>{
+          e.preventDefault(); z.classList.remove('droptarget');
+          const name = e.dataTransfer.getData('text/plain');
+          const from = e.dataTransfer.getData('application/x-side');
+          if(!name) return;
+          if(z === listPlay){
+            if(from !== 'playing') moveToPlay(name);
+          } else {
+            if(from === 'playing') moveToNot(name);
+          }
+        });
+      }
+    }
+
+    function renderTeams(){
+      const section = document.getElementById('teamsSection');
+      const tbody = document.getElementById('teamsBody');
+      tbody.innerHTML = '';
+      if(!state.teams || state.teams.length === 0){
+        // No teams yet: leave table empty
+        return;
+      }
+      for(const team of state.teams){
+        const tr = document.createElement('tr');
+        const tdTeam = document.createElement('td');
+        const pill = document.createElement('span');
+        pill.className = 'team-pill';
+        pill.style.borderColor = team.color;
+        const sw = document.createElement('span');
+        sw.className = 'pill-swatch';
+        sw.style.background = team.color;
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'team-name';
+        nameSpan.contentEditable = 'true';
+        nameSpan.textContent = team.name;
+        nameSpan.dataset.teamId = String(team.id);
+        nameSpan.ariaLabel = `Edit name for ${team.name}`;
+        nameSpan.addEventListener('keydown', (e)=>{
+          if(e.key === 'Enter'){ e.preventDefault(); nameSpan.blur(); }
+        });
+        nameSpan.addEventListener('blur', ()=>{
+          const val = (nameSpan.textContent || '').trim();
+          team.name = val || team.name; // keep previous if blank
+          saveTeams();
+          renderSchedule();
+        });
+        pill.appendChild(sw);
+        pill.appendChild(nameSpan);
+        tdTeam.appendChild(pill);
+
+        const tdMembers = document.createElement('td');
+        tdMembers.textContent = team.members.join(', ');
+
+        const tdSize = document.createElement('td');
+        tdSize.textContent = String(team.members.length);
+
+        tr.appendChild(tdTeam); tr.appendChild(tdMembers); tr.appendChild(tdSize);
+        tbody.appendChild(tr);
+      }
+      renderSchedule();
+    }
+
+    function renderSchedule(){
+      const schedSec = document.getElementById('matchesSection');
+      const list = document.getElementById('matchesList');
+      list.innerHTML = '';
+      if(!state.teams || state.teams.length < 2){
+        const info = document.createElement('div');
+        info.className = 'notice';
+        info.textContent = 'Generate teams to see the match schedule.';
+        list.appendChild(info);
+        return;
+      }
+      const pairings = [];
+      for(let i=0;i<state.teams.length;i++){
+        for(let j=i+1;j<state.teams.length;j++){
+          pairings.push([state.teams[i], state.teams[j]]);
+        }
+      }
+      const totalRounds = Math.max(1, Number(state.rounds) || 2);
+      for(let roundIdx=0; roundIdx<totalRounds; roundIdx++){
+        const h = document.createElement('div');
+        h.style.marginTop = roundIdx === 0 ? '0' : '12px';
+        h.style.fontWeight = '700';
+        h.style.color = 'var(--muted)';
+        h.textContent = `Round ${roundIdx+1}`;
+        list.appendChild(h);
+        pairings.forEach(([a,b]) => {
+          const matchId = `${Math.min(a.id,b.id)}-${Math.max(a.id,b.id)}-r${roundIdx+1}`;
+          const rec = state.results[matchId] || null;
+
+          const row = document.createElement('div');
+          row.className = 'pair';
+          row.style.display = 'flex';
+          row.style.flexWrap = 'wrap';
+          row.style.gap = '8px 12px';
+          row.style.alignItems = 'center';
+
+          const label = document.createElement('div');
+          label.style.flex = '1 1 220px';
+          label.textContent = `${a.name} vs ${b.name}`;
+
+          const score = document.createElement('div');
+          score.style.minWidth = '90px';
+          score.style.fontWeight = '600';
+          score.style.color = rec && rec.ga != null && rec.gb != null ? '#111827' : 'var(--muted)';
+          score.textContent = rec && rec.ga != null && rec.gb != null ? `${rec.ga} - ${rec.gb}` : 'No result';
+
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn';
+          btn.textContent = rec && rec.ga != null && rec.gb != null ? 'Edit Result' : 'Set Result';
+          btn.addEventListener('click', ()=> openResultModal({ matchId, a, b, round: roundIdx+1 }));
+
+          row.appendChild(label);
+          row.appendChild(score);
+          row.appendChild(btn);
+          list.appendChild(row);
+        });
+      }
+      // Add bottom "Add additional round" button
+      const addWrap = document.createElement('div');
+      addWrap.style.margin = '12px 0 0 0';
+      addWrap.style.display = 'flex';
+      addWrap.style.justifyContent = 'flex-end';
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button'; addBtn.className = 'btn'; addBtn.textContent = 'Add additional round';
+      addBtn.addEventListener('click', addAdditionalRound);
+      addWrap.appendChild(addBtn);
+      list.appendChild(addWrap);
+      renderLeaderboard();
+    }
+
+    function renderLeaderboard(){
+      const lb = document.getElementById('leaderboardSection');
+      lb.innerHTML = '';
+      if(!state.teams || state.teams.length === 0){
+        const info = document.createElement('div');
+        info.className = 'notice';
+        info.textContent = 'Generate teams to see the leaderboard.';
+        lb.appendChild(info);
+        return;
+      }
+
+      const title = document.createElement('h2');
+      title.textContent = 'Leaderboard';
+      title.style.margin = '16px 0 8px 0';
+      lb.appendChild(title);
+
+      // Compute points per team
+      const byId = new Map(state.teams.map(t => [t.id, { team: t, pts: 0, played: 0, gf: 0 }]));
+      for(const key of Object.keys(state.results || {})){
+        const r = state.results[key];
+        if(!r) continue;
+        const { a, b, ga, gb } = r;
+        if(ga === null || gb === null || ga === undefined || gb === undefined) continue;
+        const A = byId.get(a); const B = byId.get(b);
+        if(!A || !B) continue;
+        A.played++; B.played++;
+        A.gf += ga; B.gf += gb;
+        if(ga > gb){ A.pts += 3; }
+        else if(gb > ga){ B.pts += 3; }
+        else { A.pts += 1; B.pts += 1; }
+      }
+      const rows = Array.from(byId.values()).sort((x,y)=> y.pts - x.pts || y.gf - x.gf || x.team.name.localeCompare(y.team.name));
+
+      // Winner banner if tournament complete
+      if(areAllMatchesScored() && rows.length){
+        const top = rows[0];
+        const win = document.createElement('div');
+        win.className = 'winner-banner';
+        win.textContent = `WINNER: ${top.team.name.toUpperCase()}!!`;
+        lb.appendChild(win);
+        if(!state.celebrated){
+          celebrateWinner();
+          state.celebrated = true;
+        }
+      }
+
+      const wrap = document.createElement('div');
+      wrap.style.overflow = 'auto';
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      thead.innerHTML = '<tr><th style="width:50%">Team</th><th>Played</th><th>Points</th><th>Goals</th></tr>';
+      const tbody = document.createElement('tbody');
+      for(const r of rows){
+        const tr = document.createElement('tr');
+        const tdTeam = document.createElement('td');
+        tdTeam.textContent = r.team.name;
+        const tdPlayed = document.createElement('td');
+        tdPlayed.textContent = String(r.played);
+        const tdPts = document.createElement('td');
+        tdPts.textContent = String(r.pts);
+        const tdG = document.createElement('td');
+        tdG.textContent = String(r.gf);
+        tr.appendChild(tdTeam); tr.appendChild(tdPlayed); tr.appendChild(tdPts); tr.appendChild(tdG);
+        tbody.appendChild(tr);
+      }
+      table.appendChild(thead); table.appendChild(tbody);
+      wrap.appendChild(table);
+      lb.appendChild(wrap);
+    }
+
+    function updateGenError(msg){
+      const el = document.getElementById('genError');
+      if(msg){ el.textContent = msg; el.style.display = ''; }
+      else { el.textContent=''; el.style.display='none'; }
+    }
+
+    // ----- Modal: Set Result -----
+    let modalCtx = null; // { matchId, aId, bId, round }
+    function openResultModal({ matchId, a, b, round }){
+      modalCtx = { matchId, aId: a.id, bId: b.id, round };
+      const overlay = document.getElementById('overlay');
+      const modal = document.getElementById('resultModal');
+      const aName = document.getElementById('modalTeamAName');
+      const bName = document.getElementById('modalTeamBName');
+      const aInput = document.getElementById('modalTeamAScore');
+      const bInput = document.getElementById('modalTeamBScore');
+      const aMinus = document.getElementById('modalATeamMinus');
+      const aPlus = document.getElementById('modalATeamPlus');
+      const bMinus = document.getElementById('modalBTeamMinus');
+      const bPlus = document.getElementById('modalBTeamPlus');
+      const label = document.getElementById('modalMatchLabel');
+      const saveBtn = document.getElementById('modalSave');
+
+      aName.textContent = a.name;
+      bName.textContent = b.name;
+      label.textContent = `${a.name} vs ${b.name} • Round ${round}`;
+
+      const existing = state.results[matchId];
+      aInput.value = existing && existing.ga != null ? existing.ga : '0';
+      bInput.value = existing && existing.gb != null ? existing.gb : '0';
+
+      function canSave(){ return aInput.value !== '' && bInput.value !== ''; }
+      saveBtn.disabled = !canSave();
+      const onInput = ()=>{ saveBtn.disabled = !canSave(); };
+      aInput.oninput = onInput; bInput.oninput = onInput;
+
+      overlay.hidden = false; modal.hidden = false;
+      setTimeout(()=> aInput.focus(), 0);
+
+      function escHandler(e){ if(e.key === 'Escape'){ closeResultModal(); } }
+      document.addEventListener('keydown', escHandler, { once: true });
+
+      document.getElementById('modalCancel').onclick = closeResultModal;
+      overlay.onclick = closeResultModal;
+      function step(input, delta){
+        const cur = parseInt(input.value || '0', 10);
+        let v = Number.isFinite(cur) ? cur : 0;
+        v = Math.max(0, v + delta);
+        input.value = String(v);
+        onInput();
+      }
+      aMinus.onclick = ()=> step(aInput, -1);
+      aPlus.onclick = ()=> step(aInput, +1);
+      bMinus.onclick = ()=> step(bInput, -1);
+      bPlus.onclick = ()=> step(bInput, +1);
+      saveBtn.onclick = () => {
+        const ga = Math.max(0, parseInt(aInput.value, 10));
+        const gb = Math.max(0, parseInt(bInput.value, 10));
+        if(!Number.isFinite(ga) || !Number.isFinite(gb)) return;
+        state.results[matchId] = { a: modalCtx.aId, b: modalCtx.bId, round: modalCtx.round, ga, gb };
+        saveResults();
+        closeResultModal();
+        renderSchedule();
+        renderLeaderboard();
+        // Always take user to the Leaderboard after saving a result
+        switchTab('leaderboard');
+        if(areAllMatchesScored() && !state.celebrated){
+          switchTab('leaderboard');
+          celebrateWinner();
+          state.celebrated = true;
+        }
+      };
+    }
+
+    function closeResultModal(){
+      const overlay = document.getElementById('overlay');
+      const modal = document.getElementById('resultModal');
+      overlay.hidden = true; modal.hidden = true; modalCtx = null;
+    }
+
+    // ----- Modal: Add Player -----
+    function openAddPlayerModal(){
+      const overlay = document.getElementById('overlay');
+      const modal = document.getElementById('addPlayerModal');
+      const input = document.getElementById('addPlayerName');
+      const err = document.getElementById('addPlayerError');
+      const save = document.getElementById('addPlayerSave');
+      const cancel = document.getElementById('addPlayerCancel');
+
+      err.style.display = 'none';
+      err.textContent = '';
+      input.value = '';
+      save.disabled = true;
+
+      function update(){ save.disabled = input.value.trim().length === 0; }
+      input.oninput = update;
+
+      overlay.hidden = false; modal.hidden = false; setTimeout(()=> input.focus(), 0);
+      overlay.onclick = closeAddPlayerModal;
+      cancel.onclick = closeAddPlayerModal;
+      document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ closeAddPlayerModal(); } }, { once:true });
+
+      save.onclick = ()=>{
+        const name = input.value.trim();
+        if(!name){ return; }
+        if(state.attendees.length >= 16){
+          err.textContent = 'Cannot add more than 16 attendees.';
+          err.style.display = '';
+          return;
+        }
+        // If matches existing roster name (case-insensitive), use canonical name
+        const match = state.players.find(p => p.toLowerCase() === name.toLowerCase());
+        const finalName = match || name;
+        // Prevent duplicates in attendees
+        if(state.attendees.some(a => a.toLowerCase() === finalName.toLowerCase())){
+          err.textContent = 'That player is already in Playing Today.';
+          err.style.display = '';
+          return;
+        }
+        // Ensure a default skill for incidental players not in the predefined list
+        if(typeof SKILLS[finalName] !== 'number'){
+          SKILLS[finalName] = DEFAULT_SKILL;
+        }
+        state.attendees.push(finalName);
+        saveAttendees();
+        closeAddPlayerModal();
+        clampPlayLimit();
+        renderRoster();
+        updateTabsUI();
+      };
+    }
+    function closeAddPlayerModal(){
+      const overlay = document.getElementById('overlay');
+      const modal = document.getElementById('addPlayerModal');
+      overlay.hidden = true; modal.hidden = true;
+    }
+
+    // ----- Actions -----
+    function moveToPlay(name){
+      if(state.attendees.includes(name)) return;
+      if(state.attendees.length >= 16){
+        clampPlayLimit();
+        return;
+      }
+      state.attendees.push(name);
+      saveAttendees();
+      // keep teams if any? Spec doesn't forbid changing attendees post teams; leave teams intact.
+      clampPlayLimit();
+      renderRoster();
+      updateTabsUI();
+    }
+    function moveToNot(name){
+      const idx = state.attendees.indexOf(name);
+      if(idx>=0){
+        state.attendees.splice(idx,1);
+        saveAttendees();
+        clampPlayLimit();
+        renderRoster();
+        updateTabsUI();
+      }
+    }
+
+    function resetAll(){
+      state.attendees = [];
+      state.teams = [];
+      state.results = {};
+      state.timestamp = Date.now();
+      state.rounds = 2;
+      saveAttendees();
+      saveTeams();
+      saveResults();
+      saveTimestamp();
+      saveRounds();
+      updateGenError('');
+      closeResultModal();
+      renderRoster();
+      renderTeams();
+      renderSchedule();
+      renderLeaderboard();
+      switchTab('players');
+      updateTabsUI();
+    }
+
+    function addAdditionalRound(){
+      if(!state.teams || state.teams.length < 2) return;
+      state.rounds = Math.max(1, Number(state.rounds) || 2) + 1;
+      state.celebrated = false;
+      saveRounds();
+      renderSchedule();
+    }
+
+    // clearTeams replaced by resetAll (single reset action)
+
+    function computeTeamCount(n){
+      return Math.max(1, Math.min(4, Math.floor(n/4)));
+    }
+
+    function getPairings(){
+      const pairs = [];
+      if(!state.teams) return pairs;
+      for(let i=0;i<state.teams.length;i++){
+        for(let j=i+1;j<state.teams.length;j++){
+          pairs.push([state.teams[i], state.teams[j]]);
+        }
+      }
+      return pairs;
+    }
+
+    function areAllMatchesScored(){
+      if(!state.teams || state.teams.length < 2) return false;
+      const pairings = getPairings();
+      const rounds = Math.max(1, Number(state.rounds) || 2);
+      for(let r=1;r<=rounds;r++){
+        for(const [a,b] of pairings){
+          const id = `${Math.min(a.id,b.id)}-${Math.max(a.id,b.id)}-r${r}`;
+          const rec = state.results[id];
+          if(!rec || rec.ga == null || rec.gb == null) return false;
+        }
+      }
+      return true;
+    }
+
+    function celebrateWinner(){
+      // Compute top team like leaderboard
+      const byId = new Map(state.teams.map(t => [t.id, { team: t, pts: 0, played: 0, gf: 0 }]));
+      for(const key of Object.keys(state.results || {})){
+        const r = state.results[key];
+        if(!r) continue;
+        const { a, b, ga, gb } = r;
+        if(ga == null || gb == null) continue;
+        const A = byId.get(a); const B = byId.get(b);
+        if(!A || !B) continue;
+        A.played++; B.played++;
+        A.gf += ga; B.gf += gb;
+        if(ga > gb){ A.pts += 3; } else if(gb > ga){ B.pts += 3; } else { A.pts += 1; B.pts += 1; }
+      }
+      const rows = Array.from(byId.values()).sort((x,y)=> y.pts - x.pts || y.gf - x.gf || x.team.name.localeCompare(y.team.name));
+      const winner = rows.length ? rows[0].team.name : 'Winner';
+      showToast(`🎉 WINNER: ${winner.toUpperCase()}!!`, 'winner');
+      launchConfetti();
+    }
+
+    function showToast(text, extraClass){
+      const t = document.createElement('div');
+      t.className = 'toast' + (extraClass ? (' ' + extraClass) : '');
+      t.setAttribute('role','status');
+      t.setAttribute('aria-live','polite');
+      t.innerHTML = `<span class="emoji">🎉</span><span>${text}</span>`;
+      document.body.appendChild(t);
+      setTimeout(()=>{ t.remove(); }, 4000);
+    }
+
+    function launchConfetti(){
+      const colors = ['#EF4444','#F59E0B','#10B981','#3B82F6','#8B5CF6','#EC4899'];
+      const count = 80;
+      const nodes = [];
+      for(let i=0;i<count;i++){
+        const c = document.createElement('div');
+        c.className = 'confetti';
+        const left = Math.random()*100;
+        const dur = 2.8 + Math.random()*1.8;
+        const delay = Math.random()*0.5;
+        c.style.left = left + 'vw';
+        c.style.background = colors[i % colors.length];
+        c.style.animation = `confetti-fall ${dur}s linear ${delay}s forwards`;
+        document.body.appendChild(c);
+        nodes.push(c);
+      }
+      setTimeout(()=> nodes.forEach(n=> n.remove()), 5000);
+    }
+
+    function generateTeams(){
+      const n = state.attendees.length;
+      if(n < 8){
+        updateGenError('Need at least 8 attendees to generate teams.');
+        return;
+      }
+      updateGenError('');
+      if(!state.timestamp){ state.timestamp = Date.now(); saveTimestamp(); }
+
+      const t = computeTeamCount(n);
+      const shuffled = shuffleSeeded(state.attendees, state.timestamp);
+      // target sizes: base 4, last r teams +1
+      const base = Array(t).fill(4);
+      const r = n - 4*t;
+      for(let i=t-r; i<t; i++) if(i>=0 && i<t) base[i] += 1;
+
+      const colors = COLORS.slice(0, Math.min(t, COLORS.length));
+      // Build teams with capacity and running skill sum for balancing
+      const teamInfos = base.map((size, i) => ({
+        cap: size,
+        skillSum: 0,
+        team: {
+          id: i+1,
+          name: 'Team ' + colors[i].name,
+          color: colors[i].hex,
+          members: []
+        }
+      }));
+
+      // Assign players (shuffled deterministically) to the team with the lowest skill sum that has capacity
+      for(const player of shuffled){
+        const s = getSkill(player);
+        let best = 0;
+        let bestScore = Infinity;
+        for(let i=0;i<teamInfos.length;i++){
+          const info = teamInfos[i];
+          if(info.team.members.length < info.cap){
+            if(info.skillSum < bestScore){ bestScore = info.skillSum; best = i; }
+          }
+        }
+        const tgt = teamInfos[best];
+        tgt.team.members.push(player);
+        tgt.skillSum += s;
+      }
+
+      state.teams = teamInfos.map(x => x.team);
+      state.results = {};
+      state.rounds = 2;
+      saveTeams();
+      saveResults();
+      saveRounds();
+      renderTeams();
+      renderSchedule();
+      renderLeaderboard();
+      switchTab('teams');
+      updateTabsUI();
+    }
+
+    function copyTeams(){
+      if(!navigator.clipboard){ return; }
+      const lines = [];
+      for(const t of state.teams){
+        lines.push(`${t.name}: ${t.members.join(', ')}`);
+      }
+      const txt = lines.join('\n');
+      navigator.clipboard.writeText(txt).then(()=>{
+        const btn = document.getElementById('btnCopy');
+        if(btn){
+          const old = btn.textContent; btn.textContent = 'Copied!';
+          setTimeout(()=> btn.textContent = old, 1200);
+        }
+      });
+    }
+
+    // ----- Wire up -----
+    document.getElementById('btnGenerateBottom').addEventListener('click', generateTeams);
+    document.getElementById('btnReset').addEventListener('click', resetAll);
+    // Copy button removed from UI
+    document.getElementById('btnAddPlayer').addEventListener('click', openAddPlayerModal);
+
+    // Drop zones setup runs once; items are re-rendered each time
+    setupDnD();
+
+    // ----- Tabs -----
+    const tabs = {
+      players: document.getElementById('tabPlayers'),
+      teams: document.getElementById('tabTeams'),
+      matches: document.getElementById('tabMatches'),
+      leaderboard: document.getElementById('tabLeaderboard'),
+    };
+    const panels = {
+      players: document.getElementById('playersSection'),
+      teams: document.getElementById('teamsSection'),
+      matches: document.getElementById('matchesSection'),
+      leaderboard: document.getElementById('leaderboardSection'),
+    };
+    let currentTab = 'players';
+    function switchTab(which){
+      const hasTeams = state.teams && state.teams.length > 0;
+      if((which === 'teams' || which === 'matches' || which === 'leaderboard') && !hasTeams) return; // disabled
+      currentTab = which;
+      for(const [k,btn] of Object.entries(tabs)){
+        const active = k === which;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      }
+      for(const [k,el] of Object.entries(panels)){
+        el.hidden = k !== which;
+      }
+    }
+    function updateTabsUI(){
+      const hasTeams = state.teams && state.teams.length > 0;
+      tabs.teams.disabled = !hasTeams;
+      tabs.matches.disabled = !hasTeams;
+      tabs.leaderboard.disabled = !hasTeams;
+      if(!hasTeams && (currentTab === 'teams' || currentTab === 'matches' || currentTab === 'leaderboard')) switchTab('players');
+    }
+    tabs.players.addEventListener('click', ()=> switchTab('players'));
+    tabs.teams.addEventListener('click', ()=> switchTab('teams'));
+    tabs.matches.addEventListener('click', ()=> switchTab('matches'));
+    tabs.leaderboard.addEventListener('click', ()=> switchTab('leaderboard'));
+
+    // ----- Init -----
+    loadState();
+    // Initial UI
+    renderRoster();
+    renderTeams();
+    renderSchedule();
+    renderLeaderboard();
+    clampPlayLimit();
+    updateTabsUI();
+    switchTab('players');
+  </script>
+</body>
+</html>
