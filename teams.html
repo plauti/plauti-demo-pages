@@ -214,6 +214,7 @@
               <th>Team</th>
               <th>Members</th>
               <th>Size</th>
+              <th>Skill</th>
             </tr>
           </thead>
           <tbody id="teamsBody"></tbody>
@@ -313,17 +314,17 @@
       Aklilu: 4,
       Aron: 2,
       Aurant: 2,
-      Bas: 5,
+      Bas: 4,
       Bjorn: 4,
       Danny: 3,
       David: 3,
       Hanno: 5,
-      Jefta: 4,
+      Jefta: 3,
       Lenn: 4,
       Nathan: 3,
       Rene: 4,
       Sem: 5,
-      Timo: 4,
+      Timo: 3,
       Wijnand: 3,
       Willem: 4,
       Amir: 4,
@@ -542,7 +543,12 @@
         const tdSize = document.createElement('td');
         tdSize.textContent = String(team.members.length);
 
-        tr.appendChild(tdTeam); tr.appendChild(tdMembers); tr.appendChild(tdSize);
+        const tdSkill = document.createElement('td');
+        const total = team.members.reduce((sum, m) => sum + getSkill(m), 0);
+        const avg = team.members.length ? (total / team.members.length) : 0;
+        tdSkill.textContent = avg.toFixed(1);
+
+        tr.appendChild(tdTeam); tr.appendChild(tdMembers); tr.appendChild(tdSize); tr.appendChild(tdSkill);
         tbody.appendChild(tr);
       }
       renderSchedule();
@@ -989,8 +995,14 @@
         }
       }));
 
-      // Assign players (shuffled deterministically) to the team with the lowest skill sum that has capacity
-      for(const player of shuffled){
+      // Assign players sorted by skill desc (tie-broken by seeded shuffle) to the team with the lowest skill sum that has capacity
+      const orderIndex = new Map(shuffled.map((name, idx) => [name, idx]));
+      const playersSorted = [...state.attendees].sort((a,b)=>{
+        const sa = getSkill(a), sb = getSkill(b);
+        if(sb !== sa) return sb - sa; // higher skill first
+        return (orderIndex.get(a) ?? 0) - (orderIndex.get(b) ?? 0); // deterministic tie-breaker
+      });
+      for(const player of playersSorted){
         const s = getSkill(player);
         let best = 0;
         let bestScore = Infinity;
