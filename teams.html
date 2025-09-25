@@ -1290,19 +1290,16 @@
           err.style.display = '';
           return;
         }
-        // If matches existing roster name (case-insensitive), use canonical name
-        const match = state.players.find(p => p.toLowerCase() === name.toLowerCase());
-        const finalName = match || name;
-        // Prevent duplicates in attendees
-        if(state.attendees.some(a => a.toLowerCase() === finalName.toLowerCase())){
-          err.textContent = 'That player is already in Playing Today.';
-          err.style.display = '';
-          return;
+        // Create a unique incidental name if it clashes with roster or attendees (case-insensitive)
+        const lowerExisting = new Set([...state.players, ...state.attendees].map(x=>x.toLowerCase()));
+        let finalName = name;
+        if(lowerExisting.has(finalName.toLowerCase())){
+          let i = 2;
+          while(lowerExisting.has((name + ' ('+i+')').toLowerCase())) i++;
+          finalName = name + ' ('+i+')';
         }
-        // Assign provided skill for incidental players not in the predefined list
-        if(typeof SKILLS[finalName] !== 'number'){
-          SKILLS[finalName] = clampSkill(skillInput.value);
-        }
+        // Assign provided skill for this incidental entry name (won't affect default roster player)
+        SKILLS[finalName] = clampSkill(skillInput.value);
         state.attendees.push(finalName);
         saveAttendees();
         closeAddPlayerModal();
