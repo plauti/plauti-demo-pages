@@ -112,7 +112,6 @@
     /* Leaderboard: vertically center stats cells */
     #leaderboardSection table th,
     #leaderboardSection table td{ vertical-align: middle }
-    #leaderboardSection table th.sorted::after{ content: ' \2193'; font-size:12px; color: var(--muted) }
 
     .schedule{margin-top:16px}
     .pair{padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:#ffffff; margin-top:8px}
@@ -967,7 +966,7 @@
       wrap.style.overflow = 'auto';
       const table = document.createElement('table');
       const thead = document.createElement('thead');
-      thead.innerHTML = '<tr><th style="width:50%">Team</th><th>Played</th><th class="sorted" title="Sorted by points (desc)">Points</th><th>GD</th></tr>';
+      thead.innerHTML = '<tr><th style="width:50%">Team</th><th>Played</th><th>Points</th><th>GD</th></tr>';
       const tbody = document.createElement('tbody');
       const winningTeamId = (tournamentComplete && rows.length) ? rows[0].team.id : null;
       rows.forEach((r, idx)=>{
@@ -1043,7 +1042,7 @@
         const sTitle = document.createElement('h3'); sTitle.textContent = 'Top Scorers'; sTitle.style.margin = '12px 0 6px 0';
         lb.appendChild(sTitle);
         const sTable = document.createElement('table');
-        const sHead = document.createElement('thead'); sHead.innerHTML = '<tr><th style="width:60%">Player</th><th>Goals</th><th>AVG</th></tr>';
+        const sHead = document.createElement('thead'); sHead.innerHTML = '<tr><th style="width:60%">Player</th><th>Goals</th><th>GPM</th></tr>';
         const sBody = document.createElement('tbody');
         const topGoals = scorers[0][1];
         for(const [name, goals] of scorers){
