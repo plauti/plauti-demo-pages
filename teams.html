@@ -329,6 +329,14 @@
           <span class="notice" style="margin:0 0 6px 0">Enter a name that is not on the roster</span>
           <input id="addPlayerName" class="search" type="text" placeholder="Full name" aria-label="Player name" />
         </label>
+        <label style="display:flex; align-items:center; justify-content:space-between; gap:12px">
+          <span style="font-size:14px">Skill (1–5)</span>
+          <div class="score-stepper">
+            <button id="addPlayerSkillMinus" class="btn mini-step" type="button" aria-label="Decrease skill">−</button>
+            <input id="addPlayerSkill" class="scorer-input" type="number" inputmode="numeric" min="1" max="5" step="1" value="3" aria-label="Skill level" />
+            <button id="addPlayerSkillPlus" class="btn mini-step" type="button" aria-label="Increase skill">+</button>
+          </div>
+        </label>
         <div id="addPlayerError" class="notice error" style="display:none"></div>
       </div>
     </div>
@@ -370,7 +378,7 @@
   <script>
     // ----- Data & Storage -----
     const DEFAULT_PLAYERS = [
-      "Ruben","Job","Ramtin","Thijs","Emiel","Frits","Gerjan","Wout","Aklilu","Aron","Aurant","Bas","Bjorn","Danny","David","Hanno","Jefta","Lenn","Nathan","Rene","Sem","Timo","Wijnand","Willem","Amir"
+      "Ruben","Job","Ramtin","Thijs","Emiel","Frits","Gerjan","Wout","Aklilu","Aron","Aurant","Bas","Bjorn","Danny","David","Hanno","Jefta","Lenn","Nathan","Rene","Sem","Timo","Wijnand","Willem","Amir","Ralph"
     ];
 
     const COLORS = [
@@ -399,7 +407,7 @@
       David: 3,
       Hanno: 5,
       Jefta: 3,
-      Lenn: 4,
+      Lenn: 3,
       Nathan: 3,
       Rene: 4,
       Sem: 5,
@@ -407,6 +415,7 @@
       Wijnand: 3,
       Willem: 4,
       Amir: 4,
+      Ralph: 5,
     };
     const DEFAULT_SKILL = 3; // for incidental players
     const getSkill = (name) => (typeof SKILLS[name] === 'number' ? SKILLS[name] : DEFAULT_SKILL);
@@ -1245,6 +1254,9 @@
       const overlay = document.getElementById('overlay');
       const modal = document.getElementById('addPlayerModal');
       const input = document.getElementById('addPlayerName');
+      const skillInput = document.getElementById('addPlayerSkill');
+      const skillMinus = document.getElementById('addPlayerSkillMinus');
+      const skillPlus = document.getElementById('addPlayerSkillPlus');
       const err = document.getElementById('addPlayerError');
       const save = document.getElementById('addPlayerSave');
       const cancel = document.getElementById('addPlayerCancel');
@@ -1252,10 +1264,18 @@
       err.style.display = 'none';
       err.textContent = '';
       input.value = '';
+      skillInput.value = '3';
       save.disabled = true;
 
       function update(){ save.disabled = input.value.trim().length === 0; }
       input.oninput = update;
+      function clampSkill(v){
+        const n = Math.max(1, Math.min(5, parseInt(v||'3',10)));
+        return Number.isFinite(n) ? n : 3;
+      }
+      skillMinus.onclick = ()=>{ skillInput.value = String(clampSkill((parseInt(skillInput.value||'3',10) - 1))); };
+      skillPlus.onclick = ()=>{ skillInput.value = String(clampSkill((parseInt(skillInput.value||'3',10) + 1))); };
+      skillInput.oninput = ()=>{ skillInput.value = String(clampSkill(skillInput.value)); };
 
       overlay.hidden = false; modal.hidden = false; setTimeout(()=> input.focus(), 0);
       overlay.onclick = closeAddPlayerModal;
@@ -1279,9 +1299,9 @@
           err.style.display = '';
           return;
         }
-        // Ensure a default skill for incidental players not in the predefined list
+        // Assign provided skill for incidental players not in the predefined list
         if(typeof SKILLS[finalName] !== 'number'){
-          SKILLS[finalName] = DEFAULT_SKILL;
+          SKILLS[finalName] = clampSkill(skillInput.value);
         }
         state.attendees.push(finalName);
         saveAttendees();
@@ -1350,8 +1370,11 @@
       const r = n % t;
       for(let i=t-r; i<t; i++) if(i>=0 && i<t) base[i] += 1;
       const colors = COLORS.slice(0, Math.min(t, COLORS.length));
+      const totalSkillOv = state.attendees.reduce((s, name)=> s + getSkill(name), 0);
+      const avgSkillOv = totalSkillOv / n;
       const teamInfos = base.map((size, i) => ({
         cap: size,
+        target: size * avgSkillOv,
         skillSum: 0,
         team: { id: i+1, name: colors[i].name, color: colors[i].hex, members: [] }
       }));
@@ -1363,11 +1386,21 @@
       });
       for(const player of playersSorted){
         const s = getSkill(player);
-        let best = 0, bestScore = Infinity;
+        let best = -1, bestDef = -Infinity;
         for(let i=0;i<teamInfos.length;i++){
           const info = teamInfos[i];
-          if(info.team.members.length < info.cap && info.skillSum < bestScore){ bestScore = info.skillSum; best = i; }
+          if(info.team.members.length < info.cap){
+            const def = info.target - info.skillSum;
+            if(def > bestDef + 1e-9){ bestDef = def; best = i; }
+            else if(Math.abs(def - bestDef) <= 1e-9 && best !== -1){
+              const bi = teamInfos[best];
+              if(info.team.members.length < bi.team.members.length) best = i;
+              else if(info.team.members.length === bi.team.members.length && info.skillSum < bi.skillSum) best = i;
+              else if(info.team.members.length === bi.team.members.length && info.skillSum === bi.skillSum && i < best) best = i;
+            }
+          }
         }
+        if(best === -1) best = 0;
         const tgt = teamInfos[best];
         tgt.team.members.push(player);
         tgt.skillSum += s;
@@ -1548,9 +1581,12 @@
       for(let i=t-r; i<t; i++) if(i>=0 && i<t) base[i] += 1;
 
       const colors = COLORS.slice(0, Math.min(t, COLORS.length));
-      // Build teams with capacity and running skill sum for balancing
+      // Build teams with capacity and targets based on average skill per slot
+      const totalSkill = state.attendees.reduce((s, name)=> s + getSkill(name), 0);
+      const avgSkill = totalSkill / n;
       const teamInfos = base.map((size, i) => ({
         cap: size,
+        target: size * avgSkill,
         skillSum: 0,
         team: {
           id: i+1,
@@ -1560,7 +1596,8 @@
         }
       }));
 
-      // Assign players sorted by skill desc (tie-broken by seeded shuffle) to the team with the lowest skill sum that has capacity
+      // Assign players sorted by skill desc (tie-broken by seeded shuffle)
+      // Choose the team with the greatest deficit (target - currentSum), respecting capacity
       const orderIndex = new Map(shuffled.map((name, idx) => [name, idx]));
       const playersSorted = [...state.attendees].sort((a,b)=>{
         const sa = getSkill(a), sb = getSkill(b);
@@ -1569,14 +1606,22 @@
       });
       for(const player of playersSorted){
         const s = getSkill(player);
-        let best = 0;
-        let bestScore = Infinity;
+        let best = -1;
+        let bestDef = -Infinity;
         for(let i=0;i<teamInfos.length;i++){
           const info = teamInfos[i];
           if(info.team.members.length < info.cap){
-            if(info.skillSum < bestScore){ bestScore = info.skillSum; best = i; }
+            const def = info.target - info.skillSum;
+            if(def > bestDef + 1e-9){ bestDef = def; best = i; }
+            else if(Math.abs(def - bestDef) <= 1e-9 && best !== -1){
+              const bi = teamInfos[best];
+              if(info.team.members.length < bi.team.members.length) best = i;
+              else if(info.team.members.length === bi.team.members.length && info.skillSum < bi.skillSum) best = i;
+              else if(info.team.members.length === bi.team.members.length && info.skillSum === bi.skillSum && i < best) best = i;
+            }
           }
         }
+        if(best === -1) best = 0;
         const tgt = teamInfos[best];
         tgt.team.members.push(player);
         tgt.skillSum += s;
