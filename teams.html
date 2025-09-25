@@ -374,10 +374,10 @@
     ];
 
     const COLORS = [
-      { name: "Red",   hex: "#EF4444" },
-      { name: "Blue",  hex: "#3B82F6" },
-      { name: "Green", hex: "#10B981" },
-      { name: "Yellow",hex: "#F59E0B" },
+      { name: "Green",  hex: "#10B981" },
+      { name: "Blue",   hex: "#3B82F6" },
+      { name: "Orange", hex: "#F59E0B" },
+      { name: "Grey",   hex: "#6B7280" },
     ];
 
     // Skill levels (0-5). Adjust in code here when needed.
@@ -1159,10 +1159,12 @@
         const change = (delta)=>{
           const v = Math.max(0, parseInt(inp.value||'0',10)+(delta||0));
           inp.value = String(v);
+          syncIfTracking();
         };
         minus.onclick = ()=> change(-1);
         plus.onclick = ()=> change(+1);
-        // independent inputs; totals are not affected live
+        // independent inputs unless tracking is enabled
+        inp.oninput = ()=> syncIfTracking();
         row.appendChild(label); row.appendChild(minus); row.appendChild(inp); row.appendChild(plus);
         parent.appendChild(row);
         map.set(name, inp);
@@ -1174,7 +1176,25 @@
       const trackToggle = document.getElementById('modalTrackScorers');
       const existingHasScorers = (Object.keys(gpa).length > 0 || Object.keys(gpb).length > 0);
       trackToggle.checked = existingHasScorers ? true : getTrackScorersPref();
-      const applyToggle = ()=>{ scorersWrap.style.display = trackToggle.checked ? '' : 'none'; };
+      function sumMapVals(map){ let s=0; map.forEach((el)=>{ s += Math.max(0, parseInt(el.value||'0',10)); }); return s; }
+      function updateTotalsFromPlayers(){
+        const sa = sumMapVals(aInputs);
+        const sb = sumMapVals(bInputs);
+        const ca = Math.max(0, parseInt(aInput.value||'0',10));
+        const cb = Math.max(0, parseInt(bInput.value||'0',10));
+        // Only raise totals; never reduce below what user set
+        const na = Math.max(ca, sa);
+        const nb = Math.max(cb, sb);
+        aInput.value = String(na);
+        bInput.value = String(nb);
+      }
+      function syncIfTracking(){ if(trackToggle.checked){ updateTotalsFromPlayers(); onInput(); } }
+      const applyToggle = ()=>{
+        scorersWrap.style.display = trackToggle.checked ? '' : 'none';
+        aInput.disabled = trackToggle.checked;
+        bInput.disabled = trackToggle.checked;
+        if(trackToggle.checked){ updateTotalsFromPlayers(); onInput(); }
+      };
       applyToggle();
       trackToggle.onchange = ()=>{ applyToggle(); setTrackScorersPref(trackToggle.checked); };
       const saveError = document.getElementById('modalSaveError');
@@ -1185,15 +1205,19 @@
         if(trackToggle.checked){
           let sa=0,sb=0; aInputs.forEach((el)=>{ sa += Math.max(0, parseInt(el.value||'0',10)); });
           bInputs.forEach((el)=>{ sb += Math.max(0, parseInt(el.value||'0',10)); });
-          if(sa !== ga || sb !== gb){
+          // Auto-raise totals if player sums surpass them; never decrease totals
+          const finalA = Math.max(ga, sa);
+          const finalB = Math.max(gb, sb);
+          // Strict validation: if player sums are below totals, block save
+          if(sa < finalA || sb < finalB){
             saveError.style.display='';
-            saveError.textContent = `Totals mismatch: ${sa}-${sb} from players vs ${ga}-${gb} team score.`;
+            saveError.textContent = `Distribute all goals to players: need ${finalA}-${finalB}, have ${sa}-${sb}.`;
             return;
           }
           saveError.style.display='none';
           const outA = {}; aInputs.forEach((el, name)=>{ const n = Math.max(0, parseInt(el.value||'0',10)); if(n>0) outA[name]=n; });
           const outB = {}; bInputs.forEach((el, name)=>{ const n = Math.max(0, parseInt(el.value||'0',10)); if(n>0) outB[name]=n; });
-          state.results[matchId] = { a: modalCtx.aId, b: modalCtx.bId, round: modalCtx.round, ga, gb, gpa: outA, gpb: outB };
+          state.results[matchId] = { a: modalCtx.aId, b: modalCtx.bId, round: modalCtx.round, ga: finalA, gb: finalB, gpa: outA, gpb: outB };
         } else {
           saveError.style.display='none';
           state.results[matchId] = { a: modalCtx.aId, b: modalCtx.bId, round: modalCtx.round, ga, gb };
