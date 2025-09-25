@@ -118,6 +118,11 @@
     .pair{padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:#ffffff; margin-top:8px}
     .pair.played{ opacity:.6 }
     .match-score{ text-align:right; margin-left:auto; display:flex; align-items:center; justify-content:flex-end; gap:8px }
+    /* Next match highlighting */
+    .pair.next{ border-color:#2563eb; border-width:2px }
+    .next-heading{ color:#2563eb; font-weight:800; letter-spacing:.2px; margin:8px 0 4px 0 }
+    /* Matches: show players by default; stacked layout handled in JS */
+    @media (max-width:600px){ .match-score{ flex-direction:column; gap:4px } }
     /* Breathing room under panel headers in Players tab */
     #playersSection .panel > div:first-child{ margin-bottom: 10px }
 
@@ -139,10 +144,10 @@
       .actions .btn.primary{flex:1}
       .panel{border-radius:12px}
       .item{border-radius:12px}
-      /* Toned-down steppers on mobile */
-      .btn.step{ min-width:44px; min-height:44px; font-size:22px }
-      .score-input{ width:64px !important; min-height:44px; font-size:20px }
-      .modal .score-stepper{ gap:8px }
+      /* Compact steppers on mobile */
+      .btn.step{ min-width:32px; min-height:32px; font-size:18px }
+      .score-input{ width:48px !important; min-height:32px; font-size:16px }
+      .modal .score-stepper{ gap:6px; margin:0 6px }
     }
 
     /* Modal */
@@ -160,15 +165,21 @@
     .modal .modal-body{ padding:14px 16px}
     .modal .modal-actions{ display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid var(--border)}
     .modal .modal-fields{ display:grid; grid-template-columns:1fr; gap:12px }
-    .modal .modal-fields label{ display:flex; align-items:center; justify-content:space-between; gap:12px }
+    .modal .modal-fields label{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 6px }
     /* In modals, keep numeric inputs compact but text inputs full-width */
     .modal .modal-fields input[type="number"]{ width:100px }
     .modal .modal-fields input[type="text"],
     .modal .modal-fields input[type="search"]{ width:100% }
     .modal .score-row{ display:grid; grid-template-columns:1fr auto; align-items:center; gap:12px }
-    .modal .score-stepper{ display:flex; align-items:center; gap:10px }
-    .btn.step{ min-width:56px; min-height:56px; border-radius:12px; font-size:28px; padding:0 0; line-height:1; display:inline-flex; align-items:center; justify-content:center }
-    .score-input{ width:88px !important; min-height:56px; text-align:center; font-size:24px; border:1px solid #d1d5db; border-radius:10px; background:#fff; color:#111827 }
+    .modal .score-stepper{ display:flex; align-items:center; gap:8px; margin:0 6px }
+    .btn.step{ min-width:36px; min-height:36px; border-radius:10px; font-size:20px; padding:0; line-height:1; display:inline-flex; align-items:center; justify-content:center }
+    .score-input{ width:56px !important; min-height:36px; text-align:center; font-size:18px; border:1px solid #d1d5db; border-radius:8px; background:#fff; color:#111827 }
+    .scorers{ margin-top:8px; display:grid; grid-template-columns:1fr 1fr; gap:12px }
+    .scorer-card{ border:1px solid var(--border); border-radius:8px; padding:8px }
+    .scorer-title{ font-size:12px; font-weight:700; color:var(--muted); margin-bottom:6px; text-transform:uppercase }
+    .scorer-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin:4px 0 }
+    .scorer-input{ width:44px; min-height:28px; text-align:center; font-size:14px; border:1px solid #d1d5db; border-radius:6px }
+    .btn.mini-step{ min-width:28px; min-height:28px; border-radius:8px; font-size:16px; padding:0; line-height:1; display:inline-flex; align-items:center; justify-content:center }
 
     /* Toast & Confetti */
     .toast{
@@ -283,6 +294,7 @@
           </div>
         </label>
       </div>
+      <div id="modalScorers" class="scorers"></div>
     </div>
     <div class="modal-actions">
       <button id="modalCancel" type="button" class="btn">Cancel</button>
@@ -650,16 +662,57 @@
         }
       }
       const totalRounds = Math.max(1, Number(state.rounds) || 2);
+      let nextMarked = false;
       // Keep track of consecutive appearances across rounds to avoid 3 in a row
       const streak = new Map(state.teams.map(t => [t.id, 0]));
+      const flat = [];
       for(let roundIdx=0; roundIdx<totalRounds; roundIdx++){
+        // Order the pairings for this round to avoid 3+ consecutive matches for any team
+        const ordered = orderRoundPairings(pairings, streak, stableSeed + roundIdx*1013);
+        // accumulate flat list to compute kickoff fairness
+        for(const [a,b] of ordered){
+          const matchId = `${Math.min(a.id,b.id)}-${Math.max(a.id,b.id)}-r${roundIdx+1}`;
+          flat.push({ a, b, roundIdx, matchId });
+        }
+        // We will render below after computing kickoff for next match
+      }
+
+      // Compute kickoff for the next unplayed match to balance starts evenly
+      const startCounts = new Map(state.teams.map(t => [t.id, 0]));
+      let nextKickoffId = null;
+      const rng = mulberry32((stableSeed + 0x9e3779b9) >>> 0);
+      let nextIndex = -1;
+      for(let i=0;i<flat.length;i++){
+        const { a, b, matchId } = flat[i];
+        const rec = state.results[matchId];
+        const played = rec && rec.ga != null && rec.gb != null;
+        if(!played && nextIndex === -1){ nextIndex = i; break; }
+        // assign historical kickoff deterministically for balancing, even if not stored
+        const ca = startCounts.get(a.id) || 0;
+        const cb = startCounts.get(b.id) || 0;
+        let starter = null;
+        if(ca < cb) starter = a.id; else if(cb < ca) starter = b.id; else starter = (rng() < 0.5 ? a.id : b.id);
+        startCounts.set(starter, (startCounts.get(starter) || 0) + 1);
+      }
+      if(nextIndex >= 0){
+        const { a, b } = flat[nextIndex];
+        const ca = startCounts.get(a.id) || 0;
+        const cb = startCounts.get(b.id) || 0;
+        if(ca < cb) nextKickoffId = a.id; else if(cb < ca) nextKickoffId = b.id; else nextKickoffId = (rng() < 0.5 ? a.id : b.id);
+      }
+
+      // Now render rounds using the already prepared ordered/streak process again
+      // Reset streak and iterate to produce the same ordered sequence
+      streak.clear(); for(const t of state.teams){ streak.set(t.id, 0); }
+      let flatCursor = 0;
+      for(let roundIdx=0; roundIdx<totalRounds; roundIdx++){
+        // Add round heading now, followed by its matches
         const h = document.createElement('div');
         h.style.marginTop = roundIdx === 0 ? '0' : '12px';
         h.style.fontWeight = '700';
         h.style.color = 'var(--muted)';
         h.textContent = `Round ${roundIdx+1}`;
         list.appendChild(h);
-        // Order the pairings for this round to avoid 3+ consecutive matches for any team
         const ordered = orderRoundPairings(pairings, streak, stableSeed + roundIdx*1013);
         ordered.forEach(([a,b]) => {
           const matchId = `${Math.min(a.id,b.id)}-${Math.max(a.id,b.id)}-r${roundIdx+1}`;
@@ -675,9 +728,10 @@
           const label = document.createElement('div');
           label.style.flex = '1 1 220px';
           label.style.display = 'flex';
-          label.style.alignItems = 'center';
           label.style.gap = '8px';
-          label.style.flexWrap = 'wrap';
+          label.style.flexWrap = 'nowrap';
+          label.style.flexDirection = 'column';
+          label.style.alignItems = 'flex-start';
           const teamABox = document.createElement('div');
           teamABox.style.display = 'flex';
           teamABox.style.flexDirection = 'column';
@@ -691,6 +745,7 @@
           subA.textContent = (a.members || []).join(', ');
           teamABox.appendChild(pillA);
           teamABox.appendChild(subA);
+          teamABox.classList.add('match-team','a');
           // Removed explicit 'vs' label for cleaner layout
           const teamBBox = document.createElement('div');
           teamBBox.style.display = 'flex';
@@ -705,6 +760,7 @@
           subB.textContent = (b.members || []).join(', ');
           teamBBox.appendChild(pillB);
           teamBBox.appendChild(subB);
+          teamBBox.classList.add('match-team','b');
           label.appendChild(teamABox);
           label.appendChild(teamBBox);
 
@@ -716,6 +772,27 @@
           score.style.color = isPlayed ? '#111827' : 'var(--muted)';
           score.textContent = '';
           if(isPlayed){ row.classList.add('played'); }
+          // Insert Next match heading above the first unplayed match and emphasize the card
+          if(!isPlayed && !nextMarked){
+            const head = document.createElement('div');
+            head.className = 'next-heading';
+            head.textContent = 'Next Match';
+            list.appendChild(head);
+            row.classList.add('next');
+            nextMarked = true;
+            // Show kickoff indicator only on the first upcoming match
+            if(nextKickoffId != null){
+              if(nextKickoffId === a.id){
+                const ball = document.createElement('span');
+                ball.textContent = ' ⚽️';
+                pillA.appendChild(ball);
+              } else if(nextKickoffId === b.id){
+                const ball = document.createElement('span');
+                ball.textContent = ' ⚽️';
+                pillB.appendChild(ball);
+              }
+            }
+          }
           // Winner styling: solid team-color pill with white text
           if(isPlayed){
             if(rec.ga > rec.gb){
@@ -743,10 +820,12 @@
             setBtn.addEventListener('click', ()=> openResultModal({ matchId, a, b, round: roundIdx+1 }));
             score.appendChild(setBtn);
           }
+          // Players are always shown; no toggle button
 
           row.appendChild(label);
           row.appendChild(score);
           list.appendChild(row);
+          flatCursor++;
         });
       }
       // Add bottom "Add additional round" button
@@ -874,6 +953,31 @@
       table.appendChild(thead); table.appendChild(tbody);
       wrap.appendChild(table);
       lb.appendChild(wrap);
+
+      // Top Scorers (only players with >=1 goal)
+      const scorerTotals = new Map();
+      for(const key of Object.keys(state.results || {})){
+        const r = state.results[key]; if(!r) continue;
+        const { gpa, gpb } = r || {};
+        if(gpa){ for(const [name, n] of Object.entries(gpa)){ if(n>0){ scorerTotals.set(name, (scorerTotals.get(name)||0)+n); } } }
+        if(gpb){ for(const [name, n] of Object.entries(gpb)){ if(n>0){ scorerTotals.set(name, (scorerTotals.get(name)||0)+n); } } }
+      }
+      const scorers = Array.from(scorerTotals.entries()).filter(([_,n])=> n>0).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]));
+      if(scorers.length){
+        const sTitle = document.createElement('h3'); sTitle.textContent = 'Top Scorers'; sTitle.style.margin = '12px 0 6px 0';
+        lb.appendChild(sTitle);
+        const sTable = document.createElement('table');
+        const sHead = document.createElement('thead'); sHead.innerHTML = '<tr><th style="width:70%">Player</th><th>Goals</th></tr>';
+        const sBody = document.createElement('tbody');
+        for(const [name, n] of scorers){
+          const tr = document.createElement('tr');
+          const tdN = document.createElement('td'); tdN.textContent = name;
+          const tdG = document.createElement('td'); tdG.textContent = String(n);
+          tr.appendChild(tdN); tr.appendChild(tdG); sBody.appendChild(tr);
+        }
+        sTable.appendChild(sHead); sTable.appendChild(sBody);
+        lb.appendChild(sTable);
+      }
     }
 
     function updateGenError(msg){
@@ -950,11 +1054,56 @@
       aPlus.onclick = ()=> step(aInput, +1);
       bMinus.onclick = ()=> step(bInput, -1);
       bPlus.onclick = ()=> step(bInput, +1);
+
+      // ----- Per-player scorers -----
+      const scorersWrap = document.getElementById('modalScorers');
+      scorersWrap.innerHTML = '';
+      const aCard = document.createElement('div'); aCard.className = 'scorer-card';
+      const aTitle = document.createElement('div'); aTitle.className = 'scorer-title'; aTitle.textContent = `${a.name} scorers`;
+      aCard.appendChild(aTitle);
+      const bCard = document.createElement('div'); bCard.className = 'scorer-card';
+      const bTitle = document.createElement('div'); bTitle.className = 'scorer-title'; bTitle.textContent = `${b.name} scorers`;
+      bCard.appendChild(bTitle);
+      scorersWrap.appendChild(aCard); scorersWrap.appendChild(bCard);
+
+      const gpa = (existing && existing.gpa) ? existing.gpa : {};
+      const gpb = (existing && existing.gpb) ? existing.gpb : {};
+      const aInputs = new Map();
+      const bInputs = new Map();
+      function makeRow(name, initial, map, parent){
+        const row = document.createElement('div'); row.className = 'scorer-row';
+        const label = document.createElement('div'); label.textContent = name; label.style.flex='1';
+        const minus = document.createElement('button'); minus.type='button'; minus.className='btn mini-step'; minus.textContent='−';
+        const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.inputMode='numeric'; inp.className='scorer-input'; inp.value = (initial ?? 0);
+        const plus = document.createElement('button'); plus.type='button'; plus.className='btn mini-step'; plus.textContent='+';
+        const change = (delta)=>{
+          const v = Math.max(0, parseInt(inp.value||'0',10)+(delta||0));
+          inp.value = String(v);
+          recomputeTotals();
+        };
+        minus.onclick = ()=> change(-1);
+        plus.onclick = ()=> change(+1);
+        inp.oninput = ()=> recomputeTotals();
+        row.appendChild(label); row.appendChild(minus); row.appendChild(inp); row.appendChild(plus);
+        parent.appendChild(row);
+        map.set(name, inp);
+      }
+      for(const p of a.members){ makeRow(p, gpa[p] ?? 0, aInputs, aCard); }
+      for(const p of b.members){ makeRow(p, gpb[p] ?? 0, bInputs, bCard); }
+
+      function recomputeTotals(){
+        let sa=0,sb=0; for(const inp of aInputs.values()){ sa += Math.max(0, parseInt(inp.value||'0',10)); }
+        for(const inp of bInputs.values()){ sb += Math.max(0, parseInt(inp.value||'0',10)); }
+        aInput.value = String(sa); bInput.value = String(sb);
+        onInput();
+      }
       saveBtn.onclick = () => {
         const ga = Math.max(0, parseInt(aInput.value, 10));
         const gb = Math.max(0, parseInt(bInput.value, 10));
         if(!Number.isFinite(ga) || !Number.isFinite(gb)) return;
-        state.results[matchId] = { a: modalCtx.aId, b: modalCtx.bId, round: modalCtx.round, ga, gb };
+        const outA = {}; aInputs.forEach((el, name)=>{ const n = Math.max(0, parseInt(el.value||'0',10)); if(n>0) outA[name]=n; });
+        const outB = {}; bInputs.forEach((el, name)=>{ const n = Math.max(0, parseInt(el.value||'0',10)); if(n>0) outB[name]=n; });
+        state.results[matchId] = { a: modalCtx.aId, b: modalCtx.bId, round: modalCtx.round, ga, gb, gpa: outA, gpb: outB };
         saveResults();
         closeResultModal();
         renderSchedule();
