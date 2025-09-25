@@ -79,6 +79,7 @@
     }
     .lists{display:flex; flex-direction:column; gap:8px; max-height:360px; overflow:auto; padding:2px; -webkit-overflow-scrolling:touch; overscroll-behavior:contain}
     .item{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border:1px solid var(--border); border-radius:10px; background:#ffffff; min-height:44px}
+    .item.selected{ background:#ECFDF5; border-color:#A7F3D0 }
     .item button{background:transparent; color:#6b7280; border:none; padding:6px; cursor:pointer; font-size:18px}
     .item button:hover{color:#111827}
     .item[draggable="true"]{cursor:grab}
@@ -226,19 +227,13 @@
       <div id="playersLockedMsg" class="locked-msg" aria-live="polite"></div>
       <div class="panel" aria-labelledby="available-title">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px">
-          <h2 id="available-title">Available Players <span class="counts" id="countNot">(0)</span></h2>
+          <h2 id="available-title">Available Players</h2>
           <button id="btnAddPlayer" class="btn" type="button" aria-label="Add New Player">Add New Player</button>
         </div>
         <div id="listNot" class="lists" role="list" aria-label="Available players list"></div>
       </div>
 
-      <div class="panel" aria-labelledby="playing-title">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px">
-          <h2 id="playing-title">Playing Today <span class="counts" id="countPlay">(0/16)</span></h2>
-        </div>
-        <div id="listPlay" class="lists" role="list" aria-label="Playing list"></div>
-        <div id="limitNotice" class="notice" role="status" aria-live="polite" style="display:none">Limit reached: maximum 16 attendees.</div>
-      </div>
+      <div id="limitNotice" class="notice" role="status" aria-live="polite" style="display:none">Limit reached: maximum 16 players.</div>
       <div class="actions" id="playersActions">
         <div id="genError" class="notice error" role="alert" style="margin-right:auto; display:none"></div>
         <button class="btn primary" id="btnGenerateBottom" aria-label="Generate balanced teams (bottom)" disabled>Generate Teams</button>
@@ -449,6 +444,10 @@
         state.players = [...DEFAULT_PLAYERS];
       } else {
         try{ state.players = JSON.parse(p) || []; }catch{ state.players = [...DEFAULT_PLAYERS]; }
+        if(!Array.isArray(state.players) || state.players.length === 0){
+          state.players = [...DEFAULT_PLAYERS];
+          localStorage.setItem(KEYS.players, JSON.stringify(state.players));
+        }
       }
 
       try{ state.attendees = JSON.parse(localStorage.getItem(KEYS.attendees) || '[]'); }catch{ state.attendees = []; }
@@ -462,6 +461,7 @@
     }
 
     function saveAttendees(){ localStorage.setItem(KEYS.attendees, JSON.stringify(state.attendees)); }
+    function savePlayers(){ localStorage.setItem(KEYS.players, JSON.stringify(state.players)); }
     function saveTeams(){ localStorage.setItem(KEYS.teams, JSON.stringify(state.teams)); }
     function saveTimestamp(){ if(state.timestamp) localStorage.setItem(KEYS.timestamp, String(state.timestamp)); }
     function saveResults(){ localStorage.setItem(KEYS.results, JSON.stringify(state.results)); }
@@ -533,28 +533,23 @@
     // ----- Rendering -----
     function renderRoster(){
       const listNot = document.getElementById('listNot');
-      const listPlay = document.getElementById('listPlay');
-      listNot.innerHTML = ''; listPlay.innerHTML='';
+      listNot.innerHTML = '';
 
       const playSet = new Set(state.attendees);
-      const notPlaying = state.players
-        .filter(p => !playSet.has(p))
+      const allPlayers = state.players
+        .slice()
         .sort((a,b)=> a.localeCompare(b, undefined, { sensitivity: 'base' }));
-      const notFiltered = notPlaying;
+      const notFiltered = allPlayers;
 
-      // Available players list
+      // Available players list (single list with selection state)
       for(const name of notFiltered){
-        const item = createListItem(name, false);
+        const selected = playSet.has(name);
+        const item = createListItem(name, selected);
         listNot.appendChild(item);
       }
-      // Playing list
-      for(const name of state.attendees){
-        const item = createListItem(name, true);
-        listPlay.appendChild(item);
-      }
 
-      document.getElementById('countNot').textContent = `(${notPlaying.length})`;
-      document.getElementById('countPlay').textContent = `(${state.attendees.length}/16)`;
+      const genBtn = document.getElementById('btnGenerateBottom');
+      if(genBtn) genBtn.textContent = `Generate Teams (${state.attendees.length})`;
 
       const hasTeams = state.teams && state.teams.length>0;
       const canGen = state.attendees.length >= 8 && !hasTeams;
@@ -580,76 +575,46 @@
       }
     }
 
-    function createListItem(name, isPlaying){
+    function createListItem(name, isSelected){
       const div = document.createElement('div');
       div.className = 'item';
       div.setAttribute('role','listitem');
       const locked = state.teams && state.teams.length>0;
-      div.setAttribute('draggable', locked ? 'false' : 'true');
+      div.setAttribute('draggable', 'false');
       div.dataset.name = name;
-      div.dataset.side = isPlaying ? 'playing' : 'not';
+      div.dataset.side = isSelected ? 'playing' : 'not';
 
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'move';
-      btn.ariaLabel = (isPlaying? 'Remove ' : 'Add ') + name + (isPlaying? ' from Playing' : ' to Playing');
-      btn.title = (locked ? 'Teams are generated. Reset to change players.' : (isPlaying? 'Move back' : 'Move to Playing'));
-      if(locked) btn.disabled = true;
-      btn.textContent = isPlaying ? '←' : '→';
+      // state icon
+      const icon = document.createElement('span');
+      icon.textContent = isSelected ? '✓' : '';
+      icon.style.minWidth = '16px';
 
       const label = document.createElement('div');
       label.textContent = name;
       label.style.flex = '1';
 
+      if(isSelected){ div.classList.add('selected'); }
+
       // Click anywhere on item toggles
       div.tabIndex = 0;
       const onToggle = () => {
         if(state.teams && state.teams.length>0) return; // locked
-        if(isPlaying){ moveToNot(name); } else { moveToPlay(name); }
+        if(state.attendees.includes(name)) { moveToNot(name); } else { moveToPlay(name); }
       };
-      div.addEventListener('click', (e)=>{
-        if(e.target === btn) return; // button handles its own
-        onToggle();
-      });
+      div.addEventListener('click', (e)=>{ onToggle(); });
       div.addEventListener('keydown', (e)=>{
         if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); onToggle(); }
       });
-      btn.addEventListener('click', onToggle);
 
-      // Drag & drop
-      div.addEventListener('dragstart', (e)=>{
-        if(state.teams && state.teams.length>0){ e.preventDefault(); return; }
-        e.dataTransfer.setData('text/plain', name);
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('application/x-side', isPlaying ? 'playing' : 'not');
-      });
+      // Disable DnD for simplified UI
+      div.addEventListener('dragstart', (e)=>{ e.preventDefault(); });
 
       div.appendChild(label);
-      div.appendChild(btn);
+      div.appendChild(icon);
       return div;
     }
 
-    function setupDnD(){
-      const listNot = document.getElementById('listNot');
-      const listPlay = document.getElementById('listPlay');
-      const zones = [listNot, listPlay];
-      for(const z of zones){
-        z.addEventListener('dragover', (e)=>{ if(state.teams && state.teams.length>0) return; e.preventDefault(); z.classList.add('droptarget'); });
-        z.addEventListener('dragleave', ()=> z.classList.remove('droptarget'));
-        z.addEventListener('drop', (e)=>{
-          if(state.teams && state.teams.length>0) return;
-          e.preventDefault(); z.classList.remove('droptarget');
-          const name = e.dataTransfer.getData('text/plain');
-          const from = e.dataTransfer.getData('application/x-side');
-          if(!name) return;
-          if(z === listPlay){
-            if(from !== 'playing') moveToPlay(name);
-          } else {
-            if(from === 'playing') moveToNot(name);
-          }
-        });
-      }
-    }
+    function setupDnD(){ /* DnD disabled in single-list selection UI */ }
 
     function renderTeams(){
       const section = document.getElementById('teamsSection');
@@ -1300,6 +1265,11 @@
         }
         // Assign provided skill for this incidental entry name (won't affect default roster player)
         SKILLS[finalName] = clampSkill(skillInput.value);
+        // Ensure the incidental player becomes part of the available roster list
+        if(!state.players.some(p => p.toLowerCase() === finalName.toLowerCase())){
+          state.players.push(finalName);
+          savePlayers();
+        }
         state.attendees.push(finalName);
         saveAttendees();
         closeAddPlayerModal();
