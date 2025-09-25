@@ -174,6 +174,15 @@
     .modal .score-stepper{ display:flex; align-items:center; gap:8px; margin:0 6px }
     .btn.step{ min-width:36px; min-height:36px; border-radius:10px; font-size:20px; padding:0; line-height:1; display:inline-flex; align-items:center; justify-content:center }
     .score-input{ width:56px !important; min-height:36px; text-align:center; font-size:18px; border:1px solid #d1d5db; border-radius:8px; background:#fff; color:#111827 }
+    /* Big toggle switch */
+    .switch{ display:flex; align-items:center; gap:10px; padding:0 6px }
+    .switch input{ position:absolute; opacity:0; width:1px; height:1px; overflow:hidden }
+    .switch .slider{ position:relative; width:54px; height:30px; background:#e5e7eb; border-radius:9999px; box-shadow: inset 0 0 0 1px #d1d5db; flex:0 0 auto }
+    .switch .slider::after{ content:""; position:absolute; top:3px; left:3px; width:24px; height:24px; background:#fff; border-radius:50%; box-shadow: 0 1px 2px rgba(0,0,0,.2) }
+    .switch input:focus-visible + .slider{ outline:2px solid var(--focus); outline-offset:2px }
+    .switch input:checked + .slider{ background:#2563eb; box-shadow: inset 0 0 0 1px #2563eb }
+    .switch input:checked + .slider::after{ transform: translateX(24px) }
+    .switch .switch-text{ font-size:14px }
     .scorers{ margin-top:8px; display:grid; grid-template-columns:1fr; gap:12px }
     .scorer-card{ border:1px solid var(--border); border-radius:8px; padding:8px }
     .scorer-title{ font-size:12px; font-weight:700; color:var(--muted); margin-bottom:6px; text-transform:uppercase }
@@ -247,7 +256,6 @@
               <th>Team</th>
               <th>Members</th>
               <th>Size</th>
-              <th>Skill</th>
             </tr>
           </thead>
           <tbody id="teamsBody"></tbody>
@@ -293,6 +301,14 @@
             <button id="modalBTeamPlus" class="btn step" type="button" aria-label="Increase goals">+</button>
           </div>
         </label>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:14px; padding-top:10px; border-top:1px solid var(--border)">
+        <label class="switch">
+          <input id="modalTrackScorers" type="checkbox" aria-label="Track player scorers for this match" />
+          <span class="slider"></span>
+          <span class="switch-text">Track player scorers for this match</span>
+        </label>
+        <div id="modalSaveError" class="notice error" style="display:none"></div>
       </div>
       <div id="modalScorers" class="scorers"></div>
     </div>
@@ -401,7 +417,8 @@
       teams: 'futsal.match.teams',
       timestamp: 'futsal.match.timestamp',
       results: 'futsal.match.results',
-      rounds: 'futsal.match.rounds'
+      rounds: 'futsal.match.rounds',
+      prefTrackScorers: 'futsal.pref.trackScorers'
     };
 
     const state = {
@@ -437,6 +454,11 @@
     function saveTimestamp(){ if(state.timestamp) localStorage.setItem(KEYS.timestamp, String(state.timestamp)); }
     function saveResults(){ localStorage.setItem(KEYS.results, JSON.stringify(state.results)); }
     function saveRounds(){ localStorage.setItem(KEYS.rounds, String(state.rounds)); }
+    function getTrackScorersPref(){
+      const v = localStorage.getItem(KEYS.prefTrackScorers);
+      return v === null ? false : v === 'true';
+    }
+    function setTrackScorersPref(on){ localStorage.setItem(KEYS.prefTrackScorers, on ? 'true' : 'false'); }
 
     // ----- Utilities -----
     function mulberry32(a){
@@ -647,12 +669,7 @@
         const tdSize = document.createElement('td');
         tdSize.textContent = String(team.members.length);
 
-        const tdSkill = document.createElement('td');
-        const total = team.members.reduce((sum, m) => sum + getSkill(m), 0);
-        const avg = team.members.length ? (total / team.members.length) : 0;
-        tdSkill.textContent = avg.toFixed(1);
-
-        tr.appendChild(tdTeam); tr.appendChild(tdMembers); tr.appendChild(tdSize); tr.appendChild(tdSkill);
+        tr.appendChild(tdTeam); tr.appendChild(tdMembers); tr.appendChild(tdSize);
         tbody.appendChild(tr);
       }
       renderSchedule();
@@ -920,8 +937,9 @@
       }
       const rows = Array.from(byId.values()).sort((x,y)=> y.pts - x.pts || y.gf - x.gf || x.team.name.localeCompare(y.team.name));
 
+      const tournamentComplete = areAllMatchesScored();
       // Winner banner if tournament complete
-      if(areAllMatchesScored() && rows.length){
+      if(tournamentComplete && rows.length){
         const top = rows[0];
         const win = document.createElement('div');
         win.className = 'winner-banner';
@@ -939,6 +957,7 @@
       const thead = document.createElement('thead');
       thead.innerHTML = '<tr><th style="width:50%">Team</th><th>Played</th><th class="sorted" title="Sorted by points (desc)">Points</th><th>GD</th></tr>';
       const tbody = document.createElement('tbody');
+      const winningTeamId = (tournamentComplete && rows.length) ? rows[0].team.id : null;
       for(const r of rows){
         const tr = document.createElement('tr');
         const tdTeam = document.createElement('td');
@@ -949,6 +968,12 @@
         label.textContent = r.team.name;
         pill.appendChild(label);
         tdTeam.appendChild(pill);
+        if(winningTeamId && r.team.id === winningTeamId){
+          const trophy = document.createElement('span');
+          trophy.textContent = ' 🏆';
+          trophy.style.marginLeft = '6px';
+          tdTeam.appendChild(trophy);
+        }
         const membersSmall = document.createElement('div');
         membersSmall.className = 'team-sub';
         membersSmall.textContent = r.team.members.join(', ');
@@ -969,26 +994,41 @@
       wrap.appendChild(table);
       lb.appendChild(wrap);
 
-      // Top Scorers (only players with >=1 goal)
+      // Top Scorers (only players with >=1 goal), with AVG (goals per match)
       const scorerTotals = new Map();
+      const playedCounts = new Map();
+      const teamById = new Map(state.teams.map(t => [t.id, t]));
       for(const key of Object.keys(state.results || {})){
         const r = state.results[key]; if(!r) continue;
-        const { gpa, gpb } = r || {};
+        const { a, b, ga, gb, gpa, gpb } = r || {};
         if(gpa){ for(const [name, n] of Object.entries(gpa)){ if(n>0){ scorerTotals.set(name, (scorerTotals.get(name)||0)+n); } } }
         if(gpb){ for(const [name, n] of Object.entries(gpb)){ if(n>0){ scorerTotals.set(name, (scorerTotals.get(name)||0)+n); } } }
+        const played = ga != null && gb != null;
+        if(played){
+          const teamA = teamById.get(a); const teamB = teamById.get(b);
+          if(teamA){ for(const name of teamA.members){ playedCounts.set(name, (playedCounts.get(name)||0)+1); } }
+          if(teamB){ for(const name of teamB.members){ playedCounts.set(name, (playedCounts.get(name)||0)+1); } }
+        }
       }
-      const scorers = Array.from(scorerTotals.entries()).filter(([_,n])=> n>0).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]));
+      const scorers = Array.from(scorerTotals.entries())
+        .filter(([_,n])=> n>0)
+        .sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]));
       if(scorers.length){
         const sTitle = document.createElement('h3'); sTitle.textContent = 'Top Scorers'; sTitle.style.margin = '12px 0 6px 0';
         lb.appendChild(sTitle);
         const sTable = document.createElement('table');
-        const sHead = document.createElement('thead'); sHead.innerHTML = '<tr><th style="width:70%">Player</th><th>Goals</th></tr>';
+        const sHead = document.createElement('thead'); sHead.innerHTML = '<tr><th style="width:60%">Player</th><th>Goals</th><th>AVG</th></tr>';
         const sBody = document.createElement('tbody');
-        for(const [name, n] of scorers){
+        const topGoals = scorers[0][1];
+        for(const [name, goals] of scorers){
+          const played = playedCounts.get(name) || 0;
+          const avg = played ? (goals/played) : 0;
           const tr = document.createElement('tr');
-          const tdN = document.createElement('td'); tdN.textContent = name;
-          const tdG = document.createElement('td'); tdG.textContent = String(n);
-          tr.appendChild(tdN); tr.appendChild(tdG); sBody.appendChild(tr);
+          const tdN = document.createElement('td');
+          tdN.textContent = name + ((tournamentComplete && goals === topGoals) ? ' 🏆' : '');
+          const tdG = document.createElement('td'); tdG.textContent = String(goals);
+          const tdAvg = document.createElement('td'); tdAvg.textContent = avg.toFixed(1);
+          tr.appendChild(tdN); tr.appendChild(tdG); tr.appendChild(tdAvg); sBody.appendChild(tr);
         }
         sTable.appendChild(sHead); sTable.appendChild(sBody);
         lb.appendChild(sTable);
@@ -1094,11 +1134,10 @@
         const change = (delta)=>{
           const v = Math.max(0, parseInt(inp.value||'0',10)+(delta||0));
           inp.value = String(v);
-          recomputeTotals();
         };
         minus.onclick = ()=> change(-1);
         plus.onclick = ()=> change(+1);
-        inp.oninput = ()=> recomputeTotals();
+        // independent inputs; totals are not affected live
         row.appendChild(label); row.appendChild(minus); row.appendChild(inp); row.appendChild(plus);
         parent.appendChild(row);
         map.set(name, inp);
@@ -1106,19 +1145,34 @@
       for(const p of a.members){ makeRow(p, gpa[p] ?? 0, aInputs, aCard); }
       for(const p of b.members){ makeRow(p, gpb[p] ?? 0, bInputs, bCard); }
 
-      function recomputeTotals(){
-        let sa=0,sb=0; for(const inp of aInputs.values()){ sa += Math.max(0, parseInt(inp.value||'0',10)); }
-        for(const inp of bInputs.values()){ sb += Math.max(0, parseInt(inp.value||'0',10)); }
-        aInput.value = String(sa); bInput.value = String(sb);
-        onInput();
-      }
+      // Toggle tracking visibility
+      const trackToggle = document.getElementById('modalTrackScorers');
+      const existingHasScorers = (Object.keys(gpa).length > 0 || Object.keys(gpb).length > 0);
+      trackToggle.checked = existingHasScorers ? true : getTrackScorersPref();
+      const applyToggle = ()=>{ scorersWrap.style.display = trackToggle.checked ? '' : 'none'; };
+      applyToggle();
+      trackToggle.onchange = ()=>{ applyToggle(); setTrackScorersPref(trackToggle.checked); };
+      const saveError = document.getElementById('modalSaveError');
       saveBtn.onclick = () => {
         const ga = Math.max(0, parseInt(aInput.value, 10));
         const gb = Math.max(0, parseInt(bInput.value, 10));
         if(!Number.isFinite(ga) || !Number.isFinite(gb)) return;
-        const outA = {}; aInputs.forEach((el, name)=>{ const n = Math.max(0, parseInt(el.value||'0',10)); if(n>0) outA[name]=n; });
-        const outB = {}; bInputs.forEach((el, name)=>{ const n = Math.max(0, parseInt(el.value||'0',10)); if(n>0) outB[name]=n; });
-        state.results[matchId] = { a: modalCtx.aId, b: modalCtx.bId, round: modalCtx.round, ga, gb, gpa: outA, gpb: outB };
+        if(trackToggle.checked){
+          let sa=0,sb=0; aInputs.forEach((el)=>{ sa += Math.max(0, parseInt(el.value||'0',10)); });
+          bInputs.forEach((el)=>{ sb += Math.max(0, parseInt(el.value||'0',10)); });
+          if(sa !== ga || sb !== gb){
+            saveError.style.display='';
+            saveError.textContent = `Totals mismatch: ${sa}-${sb} from players vs ${ga}-${gb} team score.`;
+            return;
+          }
+          saveError.style.display='none';
+          const outA = {}; aInputs.forEach((el, name)=>{ const n = Math.max(0, parseInt(el.value||'0',10)); if(n>0) outA[name]=n; });
+          const outB = {}; bInputs.forEach((el, name)=>{ const n = Math.max(0, parseInt(el.value||'0',10)); if(n>0) outB[name]=n; });
+          state.results[matchId] = { a: modalCtx.aId, b: modalCtx.bId, round: modalCtx.round, ga, gb, gpa: outA, gpb: outB };
+        } else {
+          saveError.style.display='none';
+          state.results[matchId] = { a: modalCtx.aId, b: modalCtx.bId, round: modalCtx.round, ga, gb };
+        }
         saveResults();
         closeResultModal();
         renderSchedule();
