@@ -482,7 +482,7 @@
     }
 
     // Stable time-windowed seeding: same attendees within window -> same seed
-    const STABLE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+    const STABLE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
     function fnv1a32(str){
       let h = 0x811c9dc5>>>0;
       for(let i=0;i<str.length;i++){
