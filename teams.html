@@ -25,6 +25,8 @@
       margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;
       background: radial-gradient(1200px 800px at 10% 10%, #e5f0ff 0%, #f8fafc 60%);
       color:var(--text);
+      display:flex; flex-direction:column; min-height:100svh;
+      overflow-x:hidden;
     }
     header{
       display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
@@ -47,7 +49,7 @@
     .btn.danger{background:linear-gradient(180deg, #ef4444, #dc2626); border-color:#b91c1c; color:#fff}
     .btn.secondary{background:#f3f4f6}
 
-    main{padding:18px 20px; max-width:1100px; margin:0 auto}
+    main{padding:18px 20px; max-width:1100px; margin:0 auto; flex:1; display:flex; flex-direction:column; min-height:0}
 
     /* Tabs */
     .tabs{
@@ -89,7 +91,7 @@
     .notice{margin-top:6px; color:var(--muted); font-size:12px}
     .error{color:var(--danger)}
 
-    .actions{display:flex; gap:8px; align-items:center; justify-content:flex-end; margin:12px 0}
+    .actions{display:flex; gap:8px; align-items:center; justify-content:flex-end; margin:12px 0; box-sizing:border-box}
 
     .teams{margin-top:20px}
     .teams header{display:flex; justify-content:space-between; align-items:center; gap:8px; padding:0; border:0; background:transparent; position:static}
@@ -132,14 +134,16 @@
     @media (max-width: 899px){
       header{padding:14px 12px}
       .tabs{ top:54px; padding:6px 8px }
-      main{padding:14px 12px}
+      main{padding:14px 8px; max-width:none; width:100%; margin:0}
+      .panel{padding:8px}
       .lists{max-height:40vh}
       .actions{
         position: sticky; bottom: env(safe-area-inset-bottom, 0px);
         background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,0.95));
         border-top:1px solid var(--border);
         padding:10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
-        margin-left:-8px; margin-right:-8px;
+        margin: 0;
+        width: 100%;
       }
       .actions .btn.primary{flex:1}
       .panel{border-radius:12px}
@@ -207,6 +211,12 @@
     #playersSection.locked .panel{ opacity:.5; pointer-events:none }
     #playersSection .locked-msg{ display:none; background:#fff8e1; border:1px solid #fde68a; color:#b45309; padding:10px 12px; border-radius:8px; font-weight:700; margin:0 0 8px 0 }
     #playersSection.locked .locked-msg{ display:block }
+    /* Make Players tab fill height and scroll its list nicely */
+    #playersSection{ flex:1; display:flex; flex-direction:column; min-height:0 }
+    #playersSection .panel{ flex:1; display:flex; flex-direction:column; min-height:0; margin-bottom:12px; padding:8px; width:100%; box-sizing:border-box }
+    #playersSection .panel .lists{ flex:1; max-height:none; min-height:0; overflow:auto; padding:0; width:100%; box-sizing:border-box }
+    #playersSection .item{ padding:10px 10px; width:100%; box-sizing:border-box }
+    #playersSection .actions{ position:sticky; bottom: env(safe-area-inset-bottom, 0px); background:linear-gradient(180deg, rgba(255,255,255,0.92), #fff); border-top:1px solid var(--border); padding:10px 8px calc(14px + env(safe-area-inset-bottom, 0px)); margin-top:8px; width:100%; box-sizing:border-box }
   </style>
 </head>
 <body>
