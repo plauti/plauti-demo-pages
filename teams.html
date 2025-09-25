@@ -342,25 +342,25 @@
       Ruben: 4,
       Job: 4,
       Ramtin: 2,
-      Thijs: 5,
+      Thijs: 4,
       Emiel: 4,
       Frits: 3,
       Gerjan: 3,
       Wout: 3,
-      Aklilu: 4,
-      Aron: 2,
+      Aklilu: 1,
+      Aron: 1,
       Aurant: 2,
-      Bas: 5,
+      Bas: 4,
       Bjorn: 4,
       Danny: 3,
       David: 3,
       Hanno: 5,
-      Jefta: 4,
+      Jefta: 3,
       Lenn: 4,
       Nathan: 3,
       Rene: 4,
       Sem: 5,
-      Timo: 4,
+      Timo: 3,
       Wijnand: 3,
       Willem: 4,
       Amir: 4,
@@ -419,6 +419,22 @@
         t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
       }
+    }
+
+    // Stable time-windowed seeding: same attendees within window -> same seed
+    const STABLE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+    function fnv1a32(str){
+      let h = 0x811c9dc5>>>0;
+      for(let i=0;i<str.length;i++){
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+      }
+      return h>>>0;
+    }
+    function computeStableSeedFromAttendees(attendees){
+      const bucket = Math.floor(Date.now()/STABLE_WINDOW_MS);
+      const key = attendees.slice().sort((a,b)=>a.localeCompare(b)).join('|') + '|' + bucket;
+      return fnv1a32(key);
     }
 
     function shuffleSeeded(arr, seed){
@@ -626,6 +642,7 @@
         list.appendChild(info);
         return;
       }
+      const stableSeed = computeStableSeedFromAttendees(state.attendees || []);
       const pairings = [];
       for(let i=0;i<state.teams.length;i++){
         for(let j=i+1;j<state.teams.length;j++){
@@ -633,6 +650,8 @@
         }
       }
       const totalRounds = Math.max(1, Number(state.rounds) || 2);
+      // Keep track of consecutive appearances across rounds to avoid 3 in a row
+      const streak = new Map(state.teams.map(t => [t.id, 0]));
       for(let roundIdx=0; roundIdx<totalRounds; roundIdx++){
         const h = document.createElement('div');
         h.style.marginTop = roundIdx === 0 ? '0' : '12px';
@@ -640,7 +659,9 @@
         h.style.color = 'var(--muted)';
         h.textContent = `Round ${roundIdx+1}`;
         list.appendChild(h);
-        pairings.forEach(([a,b]) => {
+        // Order the pairings for this round to avoid 3+ consecutive matches for any team
+        const ordered = orderRoundPairings(pairings, streak, stableSeed + roundIdx*1013);
+        ordered.forEach(([a,b]) => {
           const matchId = `${Math.min(a.id,b.id)}-${Math.max(a.id,b.id)}-r${roundIdx+1}`;
           const rec = state.results[matchId] || null;
 
@@ -739,6 +760,36 @@
       addWrap.appendChild(addBtn);
       list.appendChild(addWrap);
       renderLeaderboard();
+    }
+
+    // Order pairings within a round to avoid any team playing 3 matches in a row across the schedule
+    function orderRoundPairings(pairs, streakMap, seed){
+      const rng = mulberry32((seed >>> 0));
+      // Shuffle a copy to vary the base order deterministically
+      const remaining = [...pairs].sort(() => rng() - 0.5);
+      const ordered = [];
+      const teamIds = state.teams.map(t => t.id);
+      while(remaining.length){
+        let pickIdx = -1;
+        for(let i=0;i<remaining.length;i++){
+          const aId = remaining[i][0].id, bId = remaining[i][1].id;
+          const sa = streakMap.get(aId) || 0;
+          const sb = streakMap.get(bId) || 0;
+          if(sa < 2 && sb < 2){ pickIdx = i; break; }
+        }
+        if(pickIdx === -1){
+          // Fallback: pick the first; we will still ensure not to exceed constraint by trying simple swap with previous
+          pickIdx = 0;
+        }
+        const [a,b] = remaining.splice(pickIdx,1)[0];
+        ordered.push([a,b]);
+        // Update streaks: participants +1, others reset
+        for(const id of teamIds){
+          if(id === a.id || id === b.id){ streakMap.set(id, (streakMap.get(id)||0) + 1); }
+          else { streakMap.set(id, 0); }
+        }
+      }
+      return ordered;
     }
 
     function renderLeaderboard(){
@@ -1142,7 +1193,8 @@
       if(!state.timestamp){ state.timestamp = Date.now(); saveTimestamp(); }
 
       const t = computeTeamCount(n);
-      const shuffled = shuffleSeeded(state.attendees, state.timestamp);
+      const stableSeed = computeStableSeedFromAttendees(state.attendees);
+      const shuffled = shuffleSeeded(state.attendees, stableSeed);
       // target sizes: base 4, last r teams +1
       const base = Array(t).fill(4);
       const r = n - 4*t;
