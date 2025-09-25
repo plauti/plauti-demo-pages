@@ -160,10 +160,11 @@
       position: fixed; z-index: 51; left:50%; top: 10vh; transform: translateX(-50%);
       width: min(92vw, 480px); background: #fff; border:1px solid var(--border); border-radius:12px;
       box-shadow: 0 20px 40px rgba(0,0,0,.12);
+      display:flex; flex-direction:column; max-height:85vh; overflow:hidden;
     }
-    .modal .modal-header{ padding:14px 16px; border-bottom:1px solid var(--border)}
-    .modal .modal-body{ padding:14px 16px}
-    .modal .modal-actions{ display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid var(--border)}
+    .modal .modal-header{ padding:14px 16px; border-bottom:1px solid var(--border); position:sticky; top:0; background:#fff; z-index:1 }
+    .modal .modal-body{ padding:14px 16px; flex:1 1 auto; overflow:auto; -webkit-overflow-scrolling:touch }
+    .modal .modal-actions{ display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid var(--border); position:sticky; bottom:0; background:#fff; z-index:1 }
     .modal .modal-fields{ display:grid; grid-template-columns:1fr; gap:12px }
     .modal .modal-fields label{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 6px }
     /* In modals, keep numeric inputs compact but text inputs full-width */
@@ -418,7 +419,8 @@
       timestamp: 'futsal.match.timestamp',
       results: 'futsal.match.results',
       rounds: 'futsal.match.rounds',
-      prefTrackScorers: 'futsal.pref.trackScorers'
+      prefTrackScorers: 'futsal.pref.trackScorers',
+      prevRanks: 'futsal.leaderboard.prevRanks'
     };
 
     const state = {
@@ -428,7 +430,8 @@
       timestamp: null,
       results: {}, // matchId -> {a:idA, b:idB, round:1..N, ga:number|null, gb:number|null}
       rounds: 2,
-      celebrated: false
+      celebrated: false,
+      prevRanks: {}
     };
 
     function loadState(){
@@ -447,6 +450,7 @@
       try{ state.results = JSON.parse(localStorage.getItem(KEYS.results) || '{}'); }catch{ state.results = {}; }
       const rd = localStorage.getItem(KEYS.rounds);
       state.rounds = rd ? Math.max(1, parseInt(rd, 10) || 2) : 2;
+      state.prevRanks = getPrevRanks();
     }
 
     function saveAttendees(){ localStorage.setItem(KEYS.attendees, JSON.stringify(state.attendees)); }
@@ -459,6 +463,14 @@
       return v === null ? false : v === 'true';
     }
     function setTrackScorersPref(on){ localStorage.setItem(KEYS.prefTrackScorers, on ? 'true' : 'false'); }
+    function getPrevRanks(){
+      try{ return JSON.parse(localStorage.getItem(KEYS.prevRanks) || '{}'); }catch{ return {}; }
+    }
+    function savePrevRanksFromRows(rows){
+      const obj = {};
+      rows.forEach((r, idx)=>{ obj[r.team.id] = idx; });
+      localStorage.setItem(KEYS.prevRanks, JSON.stringify(obj));
+    }
 
     // ----- Utilities -----
     function mulberry32(a){
@@ -870,7 +882,6 @@
       addBtn.addEventListener('click', addAdditionalRound);
       addWrap.appendChild(addBtn);
       list.appendChild(addWrap);
-      renderLeaderboard();
     }
 
     // Order pairings within a round to avoid any team playing 3 matches in a row across the schedule
@@ -938,6 +949,7 @@
       const rows = Array.from(byId.values()).sort((x,y)=> y.pts - x.pts || y.gf - x.gf || x.team.name.localeCompare(y.team.name));
 
       const tournamentComplete = areAllMatchesScored();
+      const prevRanks = getPrevRanks();
       // Winner banner if tournament complete
       if(tournamentComplete && rows.length){
         const top = rows[0];
@@ -958,7 +970,7 @@
       thead.innerHTML = '<tr><th style="width:50%">Team</th><th>Played</th><th class="sorted" title="Sorted by points (desc)">Points</th><th>GD</th></tr>';
       const tbody = document.createElement('tbody');
       const winningTeamId = (tournamentComplete && rows.length) ? rows[0].team.id : null;
-      for(const r of rows){
+      rows.forEach((r, idx)=>{
         const tr = document.createElement('tr');
         const tdTeam = document.createElement('td');
         const pill = document.createElement('span');
@@ -968,6 +980,18 @@
         label.textContent = r.team.name;
         pill.appendChild(label);
         tdTeam.appendChild(pill);
+        // Rank change indicator (compare against previous render ranks)
+        const prev = prevRanks[String(r.team.id)];
+        const curr = idx;
+        if(prev !== undefined && prev !== curr){
+          const arrow = document.createElement('span');
+          arrow.style.marginLeft = '6px';
+          arrow.style.fontWeight = '700';
+          arrow.style.fontSize = '14px';
+          if(prev > curr){ arrow.textContent = ' ▲'; arrow.style.color = 'var(--accent-2)'; }
+          else { arrow.textContent = ' ▼'; arrow.style.color = 'var(--danger)'; }
+          tdTeam.appendChild(arrow);
+        }
         if(winningTeamId && r.team.id === winningTeamId){
           const trophy = document.createElement('span');
           trophy.textContent = ' 🏆';
@@ -989,10 +1013,12 @@
         else if(gd < 0) tdG.classList.add('gd-neg');
         tr.appendChild(tdTeam); tr.appendChild(tdPlayed); tr.appendChild(tdPts); tr.appendChild(tdG);
         tbody.appendChild(tr);
-      }
+      });
       table.appendChild(thead); table.appendChild(tbody);
       wrap.appendChild(table);
       lb.appendChild(wrap);
+      // Save current ranks for next comparison
+      savePrevRanksFromRows(rows);
 
       // Top Scorers (only players with >=1 goal), with AVG (goals per match)
       const scorerTotals = new Map();
@@ -1326,6 +1352,7 @@
       state.teams = teamInfos.map(x => x.team);
       state.results = {};
       state.rounds = 2;
+      localStorage.removeItem(KEYS.prevRanks);
       saveTeams(); saveResults(); saveRounds();
       renderTeams(); renderRoster(); renderSchedule(); renderLeaderboard();
       switchTab('teams'); updateTabsUI();
