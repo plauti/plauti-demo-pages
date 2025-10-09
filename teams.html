@@ -380,6 +380,21 @@
     </div>
   </div>
 
+  <!-- Modal: Remove Last Round Confirmation -->
+  <div id="removeRoundModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="removeRoundTitle" hidden>
+    <div class="modal-header">
+      <h3 id="removeRoundTitle" style="margin:0; font-size:18px">Remove Round</h3>
+    </div>
+    <div class="modal-body">
+      <div id="removeRoundInfo" class="notice" style="font-weight:600; margin-bottom:8px">Are you sure you want to remove this round?</div>
+      <div class="notice">This deletes all matches and results for that round.</div>
+    </div>
+    <div class="modal-actions">
+      <button id="removeRoundCancel" type="button" class="btn">Cancel</button>
+      <button id="removeRoundConfirm" type="button" class="btn danger">Remove</button>
+    </div>
+  </div>
+
   <script>
     // ----- Data & Storage -----
     const DEFAULT_PLAYERS = [
@@ -682,6 +697,7 @@
         return;
       }
       const stableSeed = computeStableSeedFromAttendees(state.attendees || []);
+      // Build all unique pairings
       const pairings = [];
       for(let i=0;i<state.teams.length;i++){
         for(let j=i+1;j<state.teams.length;j++){
@@ -690,18 +706,48 @@
       }
       const totalRounds = Math.max(1, Number(state.rounds) || 2);
       let nextMarked = false;
-      // Keep track of consecutive appearances across rounds to avoid 3 in a row
-      const streak = new Map(state.teams.map(t => [t.id, 0]));
+      // Compute a single deterministic round order and repeat it for all rounds
+      const baseStreak = new Map(state.teams.map(t => [t.id, 0]));
+      const baseOrdered = orderRoundPairings(pairings, baseStreak, stableSeed);
+      // Try to keep the repeated order from creating 3-in-a-row across round boundaries
+      function createsTriple(order){
+        const ids = state.teams.map(t=>t.id);
+        const streak = new Map(ids.map(id=>[id,0]));
+        for(let r=0;r<totalRounds;r++){
+          for(const [a,b] of order){
+            for(const id of ids){
+              if(id===a.id || id===b.id){ streak.set(id, (streak.get(id)||0)+1); }
+              else { streak.set(id, 0); }
+              if((streak.get(id)||0) >= 3) return true;
+            }
+          }
+        }
+        return false;
+      }
+      function rotate(arr, k){
+        const n = arr.length; const out = new Array(n);
+        for(let i=0;i<n;i++){ out[i] = arr[(i+k)%n]; }
+        return out;
+      }
+      let fixedOrdered = baseOrdered;
+      if(createsTriple(fixedOrdered)){
+        // Try reversed order
+        const rev = [...baseOrdered].reverse();
+        if(!createsTriple(rev)) fixedOrdered = rev; else {
+          // Try rotations
+          for(let k=1;k<baseOrdered.length;k++){
+            const rot = rotate(baseOrdered, k);
+            if(!createsTriple(rot)){ fixedOrdered = rot; break; }
+          }
+        }
+      }
+      // Flatten schedule for kickoff fairness and next-match detection
       const flat = [];
       for(let roundIdx=0; roundIdx<totalRounds; roundIdx++){
-        // Order the pairings for this round to avoid 3+ consecutive matches for any team
-        const ordered = orderRoundPairings(pairings, streak, stableSeed + roundIdx*1013);
-        // accumulate flat list to compute kickoff fairness
-        for(const [a,b] of ordered){
+        for(const [a,b] of fixedOrdered){
           const matchId = `${Math.min(a.id,b.id)}-${Math.max(a.id,b.id)}-r${roundIdx+1}`;
           flat.push({ a, b, roundIdx, matchId });
         }
-        // We will render below after computing kickoff for next match
       }
 
       // Compute kickoff for the next unplayed match to balance starts evenly
@@ -728,9 +774,7 @@
         if(ca < cb) nextKickoffId = a.id; else if(cb < ca) nextKickoffId = b.id; else nextKickoffId = (rng() < 0.5 ? a.id : b.id);
       }
 
-      // Now render rounds using the already prepared ordered/streak process again
-      // Reset streak and iterate to produce the same ordered sequence
-      streak.clear(); for(const t of state.teams){ streak.set(t.id, 0); }
+      // Render rounds using the fixed baseOrdered sequence for each round
       let flatCursor = 0;
       for(let roundIdx=0; roundIdx<totalRounds; roundIdx++){
         // Add round heading now, followed by its matches
@@ -740,8 +784,7 @@
         h.style.color = 'var(--muted)';
         h.textContent = `Round ${roundIdx+1}`;
         list.appendChild(h);
-        const ordered = orderRoundPairings(pairings, streak, stableSeed + roundIdx*1013);
-        ordered.forEach(([a,b]) => {
+        fixedOrdered.forEach(([a,b]) => {
           const matchId = `${Math.min(a.id,b.id)}-${Math.max(a.id,b.id)}-r${roundIdx+1}`;
           const rec = state.results[matchId] || null;
 
@@ -855,11 +898,19 @@
           flatCursor++;
         });
       }
-      // Add bottom "Add additional round" button
+      // Add bottom controls: Remove round X (if >2 rounds) and Add additional round
       const addWrap = document.createElement('div');
       addWrap.style.margin = '12px 0 0 0';
       addWrap.style.display = 'flex';
       addWrap.style.justifyContent = 'flex-end';
+      addWrap.style.gap = '8px';
+      if(totalRounds > 2 && !roundHasResults(totalRounds)){
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button'; removeBtn.className = 'btn danger';
+        removeBtn.textContent = `Remove round ${totalRounds}`;
+        removeBtn.addEventListener('click', openRemoveRoundModal);
+        addWrap.appendChild(removeBtn);
+      }
       const addBtn = document.createElement('button');
       addBtn.type = 'button'; addBtn.className = 'btn'; addBtn.textContent = 'Add additional round';
       addBtn.addEventListener('click', addAdditionalRound);
@@ -1042,6 +1093,76 @@
         sTable.appendChild(sHead); sTable.appendChild(sBody);
         lb.appendChild(sTable);
       }
+
+      // ----- Share controls (Copy only) when tournament complete -----
+      if(tournamentComplete && rows.length){
+        const shareWrap = document.createElement('div');
+        shareWrap.style.margin = '14px 0 0 0';
+        shareWrap.style.paddingTop = '10px';
+        shareWrap.style.borderTop = '1px solid var(--border)';
+        const btns = document.createElement('div');
+        btns.style.display = 'flex';
+        btns.style.gap = '8px';
+        btns.style.marginTop = '8px';
+        const copyBtn = document.createElement('button'); copyBtn.className='btn primary'; copyBtn.type='button'; copyBtn.textContent='Copy results';
+        btns.appendChild(copyBtn);
+        shareWrap.appendChild(btns);
+        lb.appendChild(shareWrap);
+
+        function doText(){ return buildShareText(); }
+        copyBtn.onclick = async ()=>{
+          const text = doText();
+          try{
+            await navigator.clipboard.writeText(text);
+            showToast('Copied summary to clipboard');
+          }catch{
+            // no clipboard: show text in prompt as a last resort
+            window.prompt('Copy the results:', text);
+          }
+        };
+      }
+    }
+
+    // Build a concise summary of what is shown on the Leaderboard
+    function buildShareText(){
+      if(!state.teams || state.teams.length===0) return 'Futsal results';
+      // Leaderboard data
+      const byId = new Map(state.teams.map(t => [t.id, { team: t, pts: 0, played: 0, gf: 0, ga: 0 }]));
+      for(const key of Object.keys(state.results || {})){
+        const r = state.results[key]; if(!r) continue;
+        const { a, b, ga, gb } = r;
+        if(ga == null || gb == null) continue;
+        const A = byId.get(a); const B = byId.get(b); if(!A||!B) continue;
+        A.played++; B.played++;
+        A.gf += ga; B.gf += gb;
+        A.ga += gb; B.ga += ga;
+        if(ga > gb) A.pts += 3; else if(gb > ga) B.pts += 3; else { A.pts += 1; B.pts += 1; }
+      }
+      const rows = Array.from(byId.values()).sort((x,y)=> y.pts - x.pts || (y.gf - y.ga) - (x.gf - x.ga) || y.gf - x.gf || x.team.name.localeCompare(y.team.name));
+      const winner = rows.length ? rows[0].team.name : 'Winner';
+      const lines = [];
+      lines.push(`🏆 WINNER: ${winner}`);
+      lines.push('Standings:');
+      rows.forEach((r, i)=>{
+        const gd = r.gf - r.ga; const gdStr = gd>=0? `+${gd}`: `${gd}`;
+        const members = r.team.members.join(', ');
+        lines.push(`${i+1}) ${r.team.name} — ${r.pts} pts (GD ${gdStr}) • ${members}`);
+      });
+      // Include Top Scorers section if it is visible in the view
+      const scorerTotals = new Map();
+      for(const key of Object.keys(state.results || {})){
+        const r = state.results[key]; if(!r) continue;
+        const { gpa, gpb } = r;
+        if(gpa){ for(const [name, n] of Object.entries(gpa)){ if(n>0){ scorerTotals.set(name, (scorerTotals.get(name)||0)+n); } } }
+        if(gpb){ for(const [name, n] of Object.entries(gpb)){ if(n>0){ scorerTotals.set(name, (scorerTotals.get(name)||0)+n); } } }
+      }
+      const scorerRows = Array.from(scorerTotals.entries()).filter(([_,n])=> n>0).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]));
+      if(scorerRows.length){
+        lines.push('Top Scorers:');
+        const top = scorerRows.slice(0, 8);
+        lines.push(top.map(([n,g])=> `${n} ${g}`).join(', '));
+      }
+      return lines.join('\n');
     }
 
     function updateGenError(msg){
@@ -1208,6 +1329,10 @@
         }
         saveResults();
         closeResultModal();
+        // Hype toast after every saved result (streak-aware)
+        try {
+          showHypeToastForMatch(matchId, a, b);
+        } catch(e) { /* best-effort */ }
         renderSchedule();
         renderLeaderboard();
         if(areAllMatchesScored() && !state.celebrated){
@@ -1454,6 +1579,64 @@
       renderSchedule();
     }
 
+    // Utility: does a given round have any recorded results?
+    function roundHasResults(r){
+      for(const key of Object.keys(state.results || {})){
+        const rec = state.results[key];
+        if(rec && Number(rec.round) === Number(r) && rec.ga != null && rec.gb != null){
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // ----- Modal: Remove Last Round -----
+    function openRemoveRoundModal(){
+      const r = Math.max(1, Number(state.rounds) || 2);
+      if(r <= 2) return; // Only removable when > 2
+      const overlay = document.getElementById('overlay');
+      const modal = document.getElementById('removeRoundModal');
+      const title = document.getElementById('removeRoundTitle');
+      const info = document.getElementById('removeRoundInfo');
+      const cancel = document.getElementById('removeRoundCancel');
+      const confirm = document.getElementById('removeRoundConfirm');
+      const blocked = roundHasResults(r);
+      title.textContent = blocked ? `Cannot remove Round ${r}` : `Remove Round ${r}?`;
+      info.textContent = blocked ? `Round ${r} has recorded results and cannot be removed. You can only remove an empty round.` : `Are you sure you want to remove round ${r}?`;
+      overlay.hidden = false; modal.hidden = false;
+      const close = ()=>{ overlay.hidden = true; modal.hidden = true; cancel.onclick = null; confirm.onclick = null; };
+      overlay.onclick = close;
+      cancel.onclick = close;
+      document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ close(); } }, { once:true });
+      if(blocked){
+        confirm.disabled = true;
+      } else {
+        confirm.disabled = false;
+        confirm.onclick = ()=>{ removeLastRound(r); close(); };
+      }
+    }
+
+    function removeLastRound(r){
+      if(roundHasResults(r)){
+        showToast('Cannot remove a round with results');
+        return;
+      }
+      // Remove all results for round r, decrement rounds, save, and re-render
+      const keys = Object.keys(state.results || {});
+      for(const k of keys){
+        const rec = state.results[k];
+        if(rec && Number(rec.round) === Number(r)){
+          delete state.results[k];
+        }
+      }
+      state.rounds = Math.max(2, Number(r) - 1); // ensure rounds never drop below 2 via this action
+      state.celebrated = false;
+      saveResults();
+      saveRounds();
+      renderSchedule();
+      renderLeaderboard();
+    }
+
     // clearTeams replaced by resetAll (single reset action)
 
     function computeTeamCount(n){
@@ -1513,6 +1696,169 @@
       t.innerHTML = `<span class="emoji">🎉</span><span>${text}</span>`;
       document.body.appendChild(t);
       setTimeout(()=>{ t.remove(); }, 4000);
+    }
+
+    // Fun hype messages after each saved result
+    const HYPE_MESSAGES = [
+      'Team {TEAM} is on fire!',
+      '{TEAM} turning up the heat!',
+      '{TEAM} are flying!',
+      'Unstoppable {TEAM}!',
+      '{TEAM} with a statement win!',
+      '{TEAM} grind it out!',
+      'Clinical from {TEAM}.',
+      '{TEAM} take the spoils!',
+      '{TEAM} are cooking!',
+      '{TEAM} bringing the smoke!',
+      'Another one for {TEAM}!',
+      '{TEAM} mean business!',
+      '{TEAM} hit different today!',
+      '{TEAM} ice cold.',
+      '{TEAM} lock it in.',
+      '{TEAM} with the dagger!',
+      '{TEAM} seal the deal!',
+      'Big dub for {TEAM}!',
+      '{TEAM} with the clean finish!',
+      '{TEAM} levels up!',
+      'Momentum with {TEAM}!',
+      '{TEAM} marches on!',
+      'Vintage {TEAM}!',
+    ];
+    const DRAW_MESSAGES = [
+      'All square — what a battle!',
+      'Deadlock! Nothing between them.',
+      'Honors even!',
+      'Stalemate — tight one.',
+      'Shared spoils!',
+    ];
+    // Schedule helper used by streak computation and sharing
+    function getFixedOrderedPairs(){
+      if(!state.teams || state.teams.length < 2) return [];
+      const pairings = [];
+      for(let i=0;i<state.teams.length;i++){
+        for(let j=i+1;j<state.teams.length;j++){
+          pairings.push([state.teams[i], state.teams[j]]);
+        }
+      }
+      const stableSeed = computeStableSeedFromAttendees(state.attendees || []);
+      const baseStreak = new Map(state.teams.map(t => [t.id, 0]));
+      const baseOrdered = orderRoundPairings(pairings, baseStreak, stableSeed);
+      const totalRounds = Math.max(1, Number(state.rounds) || 2);
+      function createsTriple(order){
+        const ids = state.teams.map(t=>t.id);
+        const streak = new Map(ids.map(id=>[id,0]));
+        for(let r=0;r<Math.min(totalRounds,3);r++){
+          for(const [a,b] of order){
+            for(const id of ids){
+              if(id===a.id || id===b.id){ streak.set(id, (streak.get(id)||0)+1); }
+              else { streak.set(id, 0); }
+              if((streak.get(id)||0) >= 3) return true;
+            }
+          }
+        }
+        return false;
+      }
+      function rotate(arr, k){ const n=arr.length; const out=new Array(n); for(let i=0;i<n;i++){ out[i]=arr[(i+k)%n]; } return out; }
+      let fixedOrdered = baseOrdered;
+      if(createsTriple(fixedOrdered)){
+        const rev = [...baseOrdered].reverse();
+        if(!createsTriple(rev)) fixedOrdered = rev; else {
+          for(let k=1;k<baseOrdered.length;k++){ const rot = rotate(baseOrdered, k); if(!createsTriple(rot)){ fixedOrdered = rot; break; } }
+        }
+      }
+      return fixedOrdered;
+    }
+
+    // Compute current W/L/D streaks up to and including a specific match
+    function computeStreaksUpTo(matchId){
+      const streaks = new Map(); // id -> { type: 'W'|'L'|'D'|null, len: number }
+      for(const t of (state.teams||[])) streaks.set(t.id, { type: null, len: 0 });
+      if(!state.teams || state.teams.length<2) return streaks;
+      const totalRounds = Math.max(1, Number(state.rounds) || 2);
+      const fixedOrdered = getFixedOrderedPairs();
+      const endOn = String(matchId);
+      let done = false;
+      for(let r=1; r<=totalRounds && !done; r++){
+        for(const [a,b] of fixedOrdered){
+          const id = `${Math.min(a.id,b.id)}-${Math.max(a.id,b.id)}-r${r}`;
+          const rec = state.results[id];
+          if(!rec || rec.ga==null || rec.gb==null){
+            if(id === endOn){ done = true; break; }
+            continue;
+          }
+          let aType = 'D', bType = 'D';
+          if(rec.ga > rec.gb){ aType='W'; bType='L'; }
+          else if(rec.gb > rec.ga){ aType='L'; bType='W'; }
+          const sa = streaks.get(a.id); const sb = streaks.get(b.id);
+          if(sa.type === aType){ sa.len += 1; } else { sa.type = aType; sa.len = 1; }
+          if(sb.type === bType){ sb.len += 1; } else { sb.type = bType; sb.len = 1; }
+          if(id === endOn){ done = true; break; }
+        }
+      }
+      return streaks;
+    }
+
+    function showHypeToastForMatch(matchId, aTeam, bTeam){
+      const rec = state.results[matchId];
+      if(!rec) return;
+      const { ga, gb } = rec;
+      if(ga === gb){
+        const msg = DRAW_MESSAGES[Math.floor(Math.random()*DRAW_MESSAGES.length)];
+        showToast(msg);
+        return;
+      }
+      const fixedOrdered = getFixedOrderedPairs(); // ensure deterministic order exists
+      const streaks = computeStreaksUpTo(matchId);
+      const aSt = streaks.get(aTeam.id) || { type:null, len:0 };
+      const bSt = streaks.get(bTeam.id) || { type:null, len:0 };
+      const winner = ga > gb ? aTeam : bTeam;
+      const loser = ga > gb ? bTeam : aTeam;
+      const wSt = ga > gb ? aSt : bSt;
+      const lSt = ga > gb ? bSt : aSt;
+      const WNAME = String(winner.name || 'Winners').toUpperCase();
+      const LNAME = String(loser.name || 'Losers').toUpperCase();
+
+      // Winner phrase
+      let line = '';
+      if(wSt.type === 'W' && wSt.len >= 2){
+        const streakStr = (wSt.len === 2) ? 'two in a row' : (wSt.len === 3 ? 'a hat‑trick of wins' : `${wSt.len} straight`);
+        const winStreakMsgs = [
+          `TEAM ${WNAME} keep rolling — ${streakStr}!`,
+          `TEAM ${WNAME} extend the streak: ${streakStr}!`,
+          `Unbeatable! TEAM ${WNAME} now on ${streakStr}.`,
+          `Momentum with TEAM ${WNAME}: ${streakStr}!`,
+        ];
+        line = winStreakMsgs[Math.floor(Math.random()*winStreakMsgs.length)];
+      } else {
+        const winMsgs = [
+          `TEAM ${WNAME} take it!`,
+          `Big win for TEAM ${WNAME}!`,
+          `Clinical from TEAM ${WNAME}.`,
+          `Statement win by TEAM ${WNAME}!`,
+          `TEAM ${WNAME} seal the deal!`,
+        ];
+        line = winMsgs[Math.floor(Math.random()*winMsgs.length)];
+      }
+
+      // Losing phrase (if consecutive losses)
+      if(lSt.type === 'L' && lSt.len >= 2){
+        const losingStr = (lSt.len === 2) ? 'two on the bounce' : `${lSt.len} straight`;
+        const loseMsgs = [
+          ` Tough stretch for TEAM ${LNAME} — ${losingStr}.`,
+          ` TEAM ${LNAME} drop ${losingStr}.`,
+          ` Skid continues for TEAM ${LNAME}: ${losingStr}.`,
+        ];
+        line += loseMsgs[Math.floor(Math.random()*loseMsgs.length)];
+      } else {
+        const singleLoseMsgs = [
+          ` Tough one for TEAM ${LNAME}.`,
+          ` TEAM ${LNAME} will look to bounce back.`,
+          ` TEAM ${LNAME} just short today.`,
+        ];
+        line += singleLoseMsgs[Math.floor(Math.random()*singleLoseMsgs.length)];
+      }
+
+      showToast(line);
     }
 
     function launchConfetti(){
