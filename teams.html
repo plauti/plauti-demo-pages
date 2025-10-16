@@ -1258,7 +1258,7 @@
         lb.appendChild(sTable);
       }
 
-      // ----- Share controls (Copy only) when tournament complete -----
+      // ----- Share controls when tournament complete -----
       if(tournamentComplete && rows.length){
         const shareWrap = document.createElement('div');
         shareWrap.style.margin = '14px 0 0 0';
@@ -1269,7 +1269,9 @@
         btns.style.gap = '8px';
         btns.style.marginTop = '8px';
         const copyBtn = document.createElement('button'); copyBtn.className='btn primary'; copyBtn.type='button'; copyBtn.textContent='Copy results';
+        const emailBtn = document.createElement('button'); emailBtn.className='btn'; emailBtn.type='button'; emailBtn.textContent='Email summary';
         btns.appendChild(copyBtn);
+        btns.appendChild(emailBtn);
         shareWrap.appendChild(btns);
         lb.appendChild(shareWrap);
 
@@ -1284,6 +1286,7 @@
             window.prompt('Copy the results:', text);
           }
         };
+        emailBtn.onclick = ()=>{ emailSummary(); };
       }
     }
 
@@ -1327,6 +1330,56 @@
         lines.push(top.map(([n,g])=> `${n} ${g}`).join(', '));
       }
       return lines.join('\n');
+    }
+
+    // CSV escaper for fields (wrap in quotes and escape quotes)
+    function csvEscape(s){
+      const str = String(s ?? '');
+      if(/[",\n]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
+      return str;
+    }
+
+    // Build per-player points summary as CSV: Date,Player,Points
+    function buildEmailSummaryText(){
+      const lines = [];
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth()+1).padStart(2,'0');
+      const dd = String(now.getDate()).padStart(2,'0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+      if(!state.teams || state.teams.length < 2){
+        lines.push('Date,Player,Points');
+        return lines.join('\n');
+      }
+      const teamById = new Map(state.teams.map(t => [t.id, t]));
+      const points = new Map();
+      for(const t of state.teams){ for(const name of (t.members||[])) points.set(name, 0); }
+      for(const key of Object.keys(state.results || {})){
+        const r = state.results[key]; if(!r) continue;
+        const { a, b, ga, gb } = r;
+        if(ga == null || gb == null) continue;
+        const ta = teamById.get(a); const tb = teamById.get(b); if(!ta || !tb) continue;
+        if(ga > gb){ for(const n of (ta.members||[])) points.set(n, (points.get(n)||0) + 3); }
+        else if(gb > ga){ for(const n of (tb.members||[])) points.set(n, (points.get(n)||0) + 3); }
+        else { for(const n of (ta.members||[])) points.set(n, (points.get(n)||0) + 1); for(const n of (tb.members||[])) points.set(n, (points.get(n)||0) + 1); }
+      }
+      const rows = Array.from(points.entries()).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]));
+      lines.push('Date,Player,Points');
+      for(const [name, pts] of rows){ lines.push(`${dateStr},${csvEscape(name)},${pts}`); }
+      return lines.join('\n');
+    }
+
+    function emailSummary(){
+      const subjectDate = new Date();
+      const yyyy = subjectDate.getFullYear();
+      const mm = String(subjectDate.getMonth()+1).padStart(2,'0');
+      const dd = String(subjectDate.getDate()).padStart(2,'0');
+      const subject = `Futsal Teams & Results — ${yyyy}-${mm}-${dd}`;
+      const body = buildEmailSummaryText();
+      const to = 'rubenvdkamp@gmail.com';
+      const mailto = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      // Open default mail client with prefilled To/Subject/Body (mobile-friendly)
+      window.location.href = mailto;
     }
 
     function updateGenError(msg){
