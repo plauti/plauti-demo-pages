@@ -261,6 +261,8 @@
               <th>Team</th>
               <th>Members</th>
               <th>Size</th>
+              <th>Avg Skill</th>
+              <th>Avg Stamina</th>
             </tr>
           </thead>
           <tbody id="teamsBody"></tbody>
@@ -411,7 +413,7 @@
     // Skill levels (0-5). Adjust in code here when needed.
     const SKILLS = {
       Ruben: 4,
-      Job: 4,
+      Job: 3,
       Ramtin: 2,
       Thijs: 4,
       Emiel: 4,
@@ -439,6 +441,38 @@
     };
     const DEFAULT_SKILL = 3; // for incidental players
     const getSkill = (name) => (typeof SKILLS[name] === 'number' ? SKILLS[name] : DEFAULT_SKILL);
+
+    // Stamina levels (1-5). Secondary to skill; used only for tie-breaks and safe post-pass swaps.
+    const STAMINA = {
+      Ruben: 4,
+      Job: 3,
+      Ramtin: 2,
+      Thijs: 4,
+      Emiel: 3,
+      Frits: 2,
+      Gerjan: 3,
+      Wout: 2,
+      Aklilu: 1,
+      Aron: 1,
+      Aurant: 2,
+      Bas: 3,
+      Bjorn: 3,
+      Danny: 3,
+      David: 3,
+      Hanno: 5,
+      Jefta: 4,
+      Lenn: 4,
+      Nathan: 4,
+      Rene: 3,
+      Sem: 4,
+      Timo: 2,
+      Wijnand: 4,
+      Willem: 4,
+      Amir: 4,
+      Ralph: 5,
+    };
+    const DEFAULT_STAMINA = 3;
+    const getStamina = (name) => (typeof STAMINA[name] === 'number' ? STAMINA[name] : DEFAULT_STAMINA);
 
     const KEYS = {
       players: 'futsal.players',
@@ -539,6 +573,122 @@
         [a[i], a[j]] = [a[j], a[i]];
       }
       return a;
+    }
+
+    // Post-pass: swap players across teams to reduce skill deviation from targets
+    // Targets are capacity * average skill across attendees. Deterministic and bounded.
+    function balanceSkillToTargets(teams){
+      if(!teams || teams.length < 2) return;
+      const attendees = state.attendees || [];
+      if(attendees.length === 0) return;
+      const totalSkill = attendees.reduce((s,n)=> s + getSkill(n), 0);
+      const avg = totalSkill / attendees.length;
+      const eps = 1e-9;
+      const maxPasses = 8;
+      // Recompute sizes/sums each pass from current teams for clarity
+      for(let pass=0; pass<maxPasses; pass++){
+        const sizes = teams.map(t => (t.members||[]).length);
+        const sums = teams.map(t => (t.members||[]).reduce((s,n)=> s + getSkill(n), 0));
+        const targets = sizes.map(sz => sz * avg);
+        let bestDelta = 0; // positive means improvement
+        let bestI = -1, bestJ = -1, bestA = null, bestB = null, bestAfterI = 0, bestAfterJ = 0;
+        for(let i=0;i<teams.length;i++){
+          for(let j=i+1;j<teams.length;j++){
+            const ti = teams[i], tj = teams[j];
+            const mi = [...(ti.members||[])].sort((a,b)=> a.localeCompare(b));
+            const mj = [...(tj.members||[])].sort((a,b)=> a.localeCompare(b));
+            const beforeErr = Math.abs(sums[i]-targets[i]) + Math.abs(sums[j]-targets[j]);
+            for(const a of mi){
+              const sa = getSkill(a);
+              for(const b of mj){
+                const sb = getSkill(b);
+                const afterI = sums[i] - sa + sb;
+                const afterJ = sums[j] - sb + sa;
+                const afterErr = Math.abs(afterI - targets[i]) + Math.abs(afterJ - targets[j]);
+                const delta = beforeErr - afterErr;
+                if(delta > bestDelta + eps || (Math.abs(delta - bestDelta) <= eps && delta > eps &&
+                   // deterministic tie-break on indices and names
+                   (bestI === -1 || i < bestI || (i === bestI && (j < bestJ || (j === bestJ && (a < bestA || (a === bestA && b < bestB)))))))){
+                  bestDelta = delta; bestI = i; bestJ = j; bestA = a; bestB = b; bestAfterI = afterI; bestAfterJ = afterJ;
+                }
+              }
+            }
+          }
+        }
+        if(bestDelta > eps && bestI !== -1){
+          const ti = teams[bestI], tj = teams[bestJ];
+          // Apply the chosen swap
+          ti.members[ti.members.indexOf(bestA)] = bestB;
+          tj.members[tj.members.indexOf(bestB)] = bestA;
+          // Continue to next pass (recompute sums/targets fresh)
+        } else {
+          break; // no improvement found
+        }
+      }
+    }
+
+    // Post-pass: swap equal-skill players to improve stamina distribution without changing skill totals.
+    function balanceStaminaEqualSkill(teams){
+      if(!teams || teams.length < 2) return;
+      const eps = 1e-9;
+      const maxPasses = 8;
+      for(let pass=0; pass<maxPasses; pass++){
+        const sizes = teams.map(t => (t.members || []).length);
+        const sums = teams.map(t => (t.members || []).reduce((s,n)=> s + getStamina(n), 0));
+        const avgs = sums.map((s,i)=> sizes[i] ? (s / sizes[i]) : 0);
+        let bestGain = 0;
+        let bestI = -1, bestJ = -1, bestA = null, bestB = null;
+        let deltaI = 0, deltaJ = 0; // stamina deltas for i and j
+        for(let i=0;i<teams.length;i++){
+          for(let j=i+1;j<teams.length;j++){
+            const ti = teams[i], tj = teams[j];
+            const si = sizes[i], sj = sizes[j];
+            const mi = [...(ti.members||[])].sort((a,b)=> a.localeCompare(b));
+            const mj = [...(tj.members||[])].sort((a,b)=> a.localeCompare(b));
+            const beforeDiff = Math.abs(avgs[i] - avgs[j]);
+            for(const a of mi){
+              for(const b of mj){
+                if(getSkill(a) !== getSkill(b)) continue;
+                const sa = getStamina(a), sb = getStamina(b);
+                let gain = 0, di = 0, dj = 0;
+                if(si < sj){
+                  if(sb <= sa) continue; // need higher stamina to smaller team
+                  const beforeSmall = avgs[i];
+                  const afterSmall = (sums[i] + (sb - sa)) / si;
+                  gain = afterSmall - beforeSmall;
+                  di = (sb - sa); dj = (sa - sb);
+                } else if (si > sj){
+                  if(sa <= sb) continue;
+                  const beforeSmall = avgs[j];
+                  const afterSmall = (sums[j] + (sa - sb)) / sj;
+                  gain = afterSmall - beforeSmall;
+                  di = (sb - sa); dj = (sa - sb);
+                } else {
+                  // Equal sizes: reduce absolute difference in average stamina
+                  const after_i = (sums[i] + (sb - sa)) / si;
+                  const after_j = (sums[j] + (sa - sb)) / sj;
+                  const afterDiff = Math.abs(after_i - after_j);
+                  gain = beforeDiff - afterDiff;
+                  di = (sb - sa); dj = (sa - sb);
+                }
+                if(gain > bestGain + eps || (Math.abs(gain - bestGain) <= eps && gain > eps &&
+                   (bestI === -1 || i < bestI || (i === bestI && (j < bestJ || (j === bestJ && (a < bestA || (a === bestA && b < bestB)))))))){
+                  bestGain = gain; bestI = i; bestJ = j; bestA = a; bestB = b; deltaI = di; deltaJ = dj;
+                }
+              }
+            }
+          }
+        }
+        if(bestGain > eps && bestI !== -1){
+          const ti = teams[bestI], tj = teams[bestJ];
+          // Apply the chosen swap
+          ti.members[ti.members.indexOf(bestA)] = bestB;
+          tj.members[tj.members.indexOf(bestB)] = bestA;
+          // continue; recompute next pass
+        } else {
+          break;
+        }
+      }
     }
 
     function clampPlayLimit(){
@@ -679,7 +829,21 @@
         const tdSize = document.createElement('td');
         tdSize.textContent = String(team.members.length);
 
-        tr.appendChild(tdTeam); tr.appendChild(tdMembers); tr.appendChild(tdSize);
+        // New columns: Avg Skill and Avg Stamina
+        const tdAvgSkill = document.createElement('td');
+        const tdAvgStamina = document.createElement('td');
+        const m = team.members || [];
+        if(m.length > 0){
+          const avgSkill = m.reduce((s,n)=> s + getSkill(n), 0) / m.length;
+          const avgStam = m.reduce((s,n)=> s + getStamina(n), 0) / m.length;
+          tdAvgSkill.textContent = avgSkill.toFixed(1);
+          tdAvgStamina.textContent = avgStam.toFixed(1);
+        } else {
+          tdAvgSkill.textContent = '—';
+          tdAvgStamina.textContent = '—';
+        }
+
+        tr.appendChild(tdTeam); tr.appendChild(tdMembers); tr.appendChild(tdSize); tr.appendChild(tdAvgSkill); tr.appendChild(tdAvgStamina);
         tbody.appendChild(tr);
       }
       renderSchedule();
@@ -1400,6 +1564,8 @@
         }
         // Assign provided skill for this incidental entry name (won't affect default roster player)
         SKILLS[finalName] = clampSkill(skillInput.value);
+        // Default stamina for incidental player names
+        if(typeof STAMINA[finalName] !== 'number') STAMINA[finalName] = DEFAULT_STAMINA;
         // Ensure the incidental player becomes part of the available roster list
         if(!state.players.some(p => p.toLowerCase() === finalName.toLowerCase())){
           state.players.push(finalName);
@@ -1467,6 +1633,9 @@
       const t = tOverride;
       const stableSeed = computeStableSeedFromAttendees(state.attendees);
       const shuffled = shuffleSeeded(state.attendees, stableSeed);
+      // Average stamina across current attendees for stamina-aware tie-breaks
+      const totalStaminaOv = state.attendees.reduce((s, name)=> s + getStamina(name), 0);
+      const avgStaminaOv = n > 0 ? (totalStaminaOv / n) : DEFAULT_STAMINA;
       // Evenly distribute capacities for override
       const base = Array(t).fill(Math.floor(n/t));
       const r = n % t;
@@ -1478,6 +1647,7 @@
         cap: size,
         target: size * avgSkillOv,
         skillSum: 0,
+        staminaSum: 0,
         team: { id: i+1, name: colors[i].name, color: colors[i].hex, members: [] }
       }));
       const orderIndex = new Map(shuffled.map((name, idx) => [name, idx]));
@@ -1488,6 +1658,7 @@
       });
       for(const player of playersSorted){
         const s = getSkill(player);
+        const st = getStamina(player);
         let best = -1, bestDef = -Infinity;
         for(let i=0;i<teamInfos.length;i++){
           const info = teamInfos[i];
@@ -1496,9 +1667,21 @@
             if(def > bestDef + 1e-9){ bestDef = def; best = i; }
             else if(Math.abs(def - bestDef) <= 1e-9 && best !== -1){
               const bi = teamInfos[best];
-              if(info.team.members.length < bi.team.members.length) best = i;
-              else if(info.team.members.length === bi.team.members.length && info.skillSum < bi.skillSum) best = i;
-              else if(info.team.members.length === bi.team.members.length && info.skillSum === bi.skillSum && i < best) best = i;
+              // Stamina-aware tie-break: only within skill tie
+              if(st >= avgStaminaOv){
+                // Prefer smaller-capacity team when player's stamina is high
+                if(info.cap < bi.cap) { best = i; }
+                else if(info.cap === bi.cap){
+                  // If capacities equal, prefer team with lower current staminaSum to even out
+                  if(info.staminaSum < bi.staminaSum) best = i;
+                }
+              }
+              // Existing deterministic tie-breakers
+              const bestIdx = best; // might have changed above
+              const bi2 = teamInfos[bestIdx];
+              if(info.team.members.length < bi2.team.members.length) best = i;
+              else if(info.team.members.length === bi2.team.members.length && info.skillSum < bi2.skillSum) best = i;
+              else if(info.team.members.length === bi2.team.members.length && info.skillSum === bi2.skillSum && i < bestIdx) best = i;
             }
           }
         }
@@ -1506,8 +1689,12 @@
         const tgt = teamInfos[best];
         tgt.team.members.push(player);
         tgt.skillSum += s;
+        tgt.staminaSum += st;
       }
       state.teams = teamInfos.map(x => x.team);
+      // Post-pass: skill balancer then stamina smoothing (equal-skill swaps)
+      try { balanceSkillToTargets(state.teams); } catch(_) { /* best-effort */ }
+      try { balanceStaminaEqualSkill(state.teams); } catch(_) { /* best-effort */ }
       state.results = {};
       state.rounds = 2;
       localStorage.removeItem(KEYS.prevRanks);
@@ -1898,6 +2085,9 @@
       const t = computeTeamCount(n);
       const stableSeed = computeStableSeedFromAttendees(state.attendees);
       const shuffled = shuffleSeeded(state.attendees, stableSeed);
+      // Average stamina across current attendees for stamina-aware tie-breaks
+      const totalStamina = state.attendees.reduce((s, name)=> s + getStamina(name), 0);
+      const avgStamina = n > 0 ? (totalStamina / n) : DEFAULT_STAMINA;
       // target sizes: base 4, last r teams +1
       const base = Array(t).fill(4);
       const r = n - 4*t;
@@ -1911,6 +2101,7 @@
         cap: size,
         target: size * avgSkill,
         skillSum: 0,
+        staminaSum: 0,
         team: {
           id: i+1,
           name: colors[i].name,
@@ -1929,6 +2120,7 @@
       });
       for(const player of playersSorted){
         const s = getSkill(player);
+        const st = getStamina(player);
         let best = -1;
         let bestDef = -Infinity;
         for(let i=0;i<teamInfos.length;i++){
@@ -1938,9 +2130,21 @@
             if(def > bestDef + 1e-9){ bestDef = def; best = i; }
             else if(Math.abs(def - bestDef) <= 1e-9 && best !== -1){
               const bi = teamInfos[best];
-              if(info.team.members.length < bi.team.members.length) best = i;
-              else if(info.team.members.length === bi.team.members.length && info.skillSum < bi.skillSum) best = i;
-              else if(info.team.members.length === bi.team.members.length && info.skillSum === bi.skillSum && i < best) best = i;
+              // Stamina-aware tie-break: only within skill tie
+              if(st >= avgStamina){
+                // Prefer smaller-capacity team when player's stamina is high
+                if(info.cap < bi.cap) { best = i; }
+                else if(info.cap === bi.cap){
+                  // If capacities equal, prefer team with lower current staminaSum to even out
+                  if(info.staminaSum < bi.staminaSum) best = i;
+                }
+              }
+              // Existing deterministic tie-breakers
+              const bestIdx = best; // may have changed above
+              const bi2 = teamInfos[bestIdx];
+              if(info.team.members.length < bi2.team.members.length) best = i;
+              else if(info.team.members.length === bi2.team.members.length && info.skillSum < bi2.skillSum) best = i;
+              else if(info.team.members.length === bi2.team.members.length && info.skillSum === bi2.skillSum && i < bestIdx) best = i;
             }
           }
         }
@@ -1948,9 +2152,13 @@
         const tgt = teamInfos[best];
         tgt.team.members.push(player);
         tgt.skillSum += s;
+        tgt.staminaSum += st;
       }
 
       state.teams = teamInfos.map(x => x.team);
+      // Post-pass: skill balancer then stamina smoothing (equal-skill swaps)
+      try { balanceSkillToTargets(state.teams); } catch(_) { /* best-effort */ }
+      try { balanceStaminaEqualSkill(state.teams); } catch(_) { /* best-effort */ }
       state.results = {};
       state.rounds = 2;
       saveTeams();
