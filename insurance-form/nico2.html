@@ -1,0 +1,66 @@
+<html>
+<head>
+<link rel="stylesheet" href="styles.css">
+<title>Request More Information</title>
+</head>
+<body>
+<br /><br />
+<div class="center">
+<h1>This webform will create a new Lead in Microsoft Dynamics 365.</h1>
+<br />
+<META HTTP-EQUIV="Content-type" CONTENT="text/html; charset=UTF-8">
+
+
+<form id="leadForm">
+
+<input type=hidden name="oid" value="00D7Q000002qBPfUAM">
+<input type=hidden name="retURL" value="https://plauti.github.io/plauti-demo-pages/insurance-form/thanks_all.html">
+
+
+<label for="topic">Topic</label><input required id="topic" maxlength="40" name="topic" size="20" type="text" /><br>
+
+<label for="first_name">First Name</label><input required id="first_name" maxlength="40" name="first_name" size="20" type="text" /><br>
+
+<label for="last_name">Last Name</label><input required id="last_name" maxlength="80" name="last_name" size="20" type="text" /><br>
+
+<label for="email">Email</label><input required id="email" maxlength="80" name="email" size="20" type="email" /><br>
+  
+<label for="mobile">Mobile Phone</label><input id="mobile" maxlength="40" name="mobile" size="20" type="text" /><br>
+  
+<label for="company">Company</label><input required id="company" maxlength="80" name="company" size="20" type="text" /><br>
+  
+ <h2>Address</h2>
+  
+<br />
+  
+<label for="street">Street</label><input id="street" maxlength="80" name="street" size="20" type="text" /><br>
+  
+<label for="city">City</label><input id="city" maxlength="80" name="city" size="20" type="text" /><br>
+  
+<label for="zip">Zip / Postal Code</label><input id="zip" maxlength="20" name="zip" size="20" type="text" /><br>
+  
+<label for="state">State / Province</label><input id="state" maxlength="80" name="state" size="20" type="text" /><br>
+  
+<label for="country">Country</label><input id="country" maxlength="80" name="country" size="20" type="text" /><br>
+
+<br /><br />
+
+<button type="submit" name="submit">Send it</button>
+  
+<br />
+
+</form>
+</div>
+</body>
+<script>
+document.getElementById('leadForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  await fetch("https://c7b382b93592e781b2779daa35ae99.47.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/26cae2fef76249d9bb17bf4133322827/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=JipURQadNXxmDT7fofqg5WLBmQD6Gcv1FKsESIEjAcA", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+  alert("Lead submitted!");
+});
+</script>
