@@ -50,6 +50,8 @@
     .btn.secondary{background:#f3f4f6}
 
     main{padding:18px 20px; max-width:1100px; margin:0 auto; flex:1; display:flex; flex-direction:column; min-height:0}
+    /* Ensure consistent top spacing across all tabs */
+    main > section{ margin-top: 8px }
 
     /* Tabs */
     .tabs{
@@ -93,7 +95,7 @@
 
     .actions{display:flex; gap:8px; align-items:center; justify-content:flex-end; margin:12px 0; box-sizing:border-box}
 
-    .teams{margin-top:20px}
+    .teams{margin-top:0}
     .teams header{display:flex; justify-content:space-between; align-items:center; gap:8px; padding:0; border:0; background:transparent; position:static}
     table{width:100%; border-collapse:collapse; overflow:hidden; border-radius:12px; border:1px solid var(--border); background:#fff}
     th, td{padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:top}
@@ -116,7 +118,7 @@
     #leaderboardSection table th,
     #leaderboardSection table td{ vertical-align: middle }
 
-    .schedule{margin-top:16px}
+    .schedule{margin-top:0}
     .pair{padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:#ffffff; margin-top:8px}
     .pair.played{ opacity:.6 }
     .match-score{ text-align:right; margin-left:auto; display:flex; align-items:center; justify-content:flex-end; gap:8px }
@@ -152,6 +154,67 @@
       .btn.step{ min-width:32px; min-height:32px; font-size:18px }
       .score-input{ width:48px !important; min-height:32px; font-size:16px }
       .modal .score-stepper{ gap:6px; margin:0 6px }
+    }
+
+    /* Tablet enhancements */
+    @media (min-width: 768px){
+      /* Global container + header/tabs spacing */
+      header{ padding:18px 24px }
+      .tabs{ justify-content:flex-start; padding:8px 16px }
+      .tab{ flex:0 0 auto; padding:10px 16px }
+      main{ padding:18px 24px; max-width:1200px; width:min(96vw, 1200px) }
+
+      /* Players: two-column grid list */
+      #playersSection .panel .lists{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px }
+      #playersSection .item{ width:100% }
+
+      /* Teams: readable fixed layout and column sizing */
+      #teamsSection table{ table-layout:fixed }
+      #teamsSection th:nth-child(1){ width:160px }
+      #teamsSection th:nth-child(3),
+      #teamsSection td:nth-child(3){ width:64px; text-align:right }
+      #teamsSection th:nth-child(4),
+      #teamsSection th:nth-child(5),
+      #teamsSection td:nth-child(4),
+      #teamsSection td:nth-child(5){ width:90px; text-align:right }
+      #teamsSection td:nth-child(2){ word-break:break-word }
+
+      /* Matches: single full-width column per match on tablet */
+      #matchesSection #matchesList{ display:grid; grid-template-columns:1fr; gap:12px }
+      #matchesSection #matchesList > :not(.pair){ grid-column:1 / -1 }
+      #matchesSection .pair{ margin-top:0; display:grid !important; grid-template-columns:1fr auto; align-items:stretch; width:100% }
+      #matchesSection .match-score{ margin-left:0 }
+      #matchesSection .match-label{ display:grid !important; grid-template-columns:1fr auto 1fr; align-items:stretch; gap:12px; min-width:0 }
+      #matchesSection .team-card{ border:1px solid var(--border); border-radius:12px; padding:8px; background:#fff; min-width:0 }
+      #matchesSection .team-card{ border:1px solid var(--border); border-radius:12px; padding:8px; background:#fff }
+      #matchesSection .vs{ align-self:center; color:var(--muted); font-weight:800; letter-spacing:.2px }
+
+      /* Leaderboard: fixed, right-aligned numeric columns */
+      #leaderboardSection table{ table-layout:fixed }
+      #leaderboardSection th:nth-child(1){ width:50% }
+      #leaderboardSection th:nth-child(2),
+      #leaderboardSection th:nth-child(3),
+      #leaderboardSection th:nth-child(4),
+      #leaderboardSection th:nth-child(5),
+      #leaderboardSection th:nth-child(6){ width:88px; text-align:right }
+      #leaderboardSection td:nth-child(2),
+      #leaderboardSection td:nth-child(3),
+      #leaderboardSection td:nth-child(4),
+      #leaderboardSection td:nth-child(5),
+      #leaderboardSection td:nth-child(6){ text-align:right }
+
+      /* Modals: wider and two-column fields */
+      .modal{ width:min(92vw, 640px) }
+      .modal .modal-fields{ grid-template-columns:1fr 1fr }
+    }
+
+    @media (max-width: 767px){
+      #matchesSection .vs{ display:none }
+    }
+
+    /* Large screens: optional small bumps without changing layout paradigms */
+    @media (min-width: 1200px){
+      main{ max-width:1200px }
     }
 
     /* Modal */
@@ -203,20 +266,31 @@
     }
     .toast .emoji{ font-size:22px }
     .toast.winner{ font-size:22px; padding:16px 20px; border-width:2px }
-    .winner-banner{ font-size:28px; font-weight:800; text-align:center; color:#111827; letter-spacing:.5px; margin:8px 0 12px }
+    .winner-banner{ font-size:28px; font-weight:800; text-align:center; color:#111827; letter-spacing:.5px; margin:0 0 12px }
     .confetti{ position: fixed; top:-10px; width:8px; height:14px; opacity:.9; z-index:55; pointer-events:none }
     @keyframes confetti-fall{ from{ transform: translateY(-10vh) rotate(0deg)} to{ transform: translateY(110vh) rotate(360deg)} }
 
-    /* Players tab locked state */
+    /* Players tab locked state (no banner) */
     #playersSection.locked .panel{ opacity:.5; pointer-events:none }
-    #playersSection .locked-msg{ display:none; background:#fff8e1; border:1px solid #fde68a; color:#b45309; padding:10px 12px; border-radius:8px; font-weight:700; margin:0 0 8px 0 }
-    #playersSection.locked .locked-msg{ display:block }
     /* Make Players tab fill height and scroll its list nicely */
     #playersSection{ flex:1; display:flex; flex-direction:column; min-height:0 }
     #playersSection .panel{ flex:1; display:flex; flex-direction:column; min-height:0; margin-bottom:12px; padding:8px; width:100%; box-sizing:border-box }
     #playersSection .panel .lists{ flex:1; max-height:none; min-height:0; overflow:auto; padding:0; width:100%; box-sizing:border-box }
     #playersSection .item{ padding:10px 10px; width:100%; box-sizing:border-box }
-    #playersSection .actions{ position:sticky; bottom: env(safe-area-inset-bottom, 0px); background:linear-gradient(180deg, rgba(255,255,255,0.92), #fff); border-top:1px solid var(--border); padding:10px 8px calc(14px + env(safe-area-inset-bottom, 0px)); margin-top:8px; width:100%; box-sizing:border-box }
+    #playersSection .actions{
+      position: sticky;
+      bottom: env(safe-area-inset-bottom, 0px);
+      /* Make the bar span the full viewport width like header/tabs */
+      left: 0; right: 0; width: 100vw;
+      margin-left: calc(50% - 50vw);
+      margin-right: calc(50% - 50vw);
+      background:linear-gradient(180deg, rgba(255,255,255,0.92), #fff);
+      border-top:1px solid var(--border);
+      padding:10px max(8px, env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
+      margin-top:8px;
+      box-sizing:border-box;
+      z-index: 3;
+    }
   </style>
 </head>
 <body>
@@ -234,7 +308,6 @@
   </nav>
   <main>
     <section id="playersSection" class="picker" role="tabpanel" aria-labelledby="tabPlayers">
-      <div id="playersLockedMsg" class="locked-msg" aria-live="polite"></div>
       <div class="panel" aria-labelledby="available-title">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px">
           <h2 id="available-title">Available Players</h2>
@@ -251,9 +324,6 @@
     </section>
 
     <section class="teams" id="teamsSection" role="tabpanel" aria-labelledby="tabTeams" hidden>
-      <header>
-        <h2 style="margin:0">Teams</h2>
-      </header>
       <div style="overflow:auto">
         <table aria-label="Teams table" id="teamsTable">
           <thead>
@@ -262,7 +332,7 @@
               <th>Members</th>
               <th>Size</th>
               <th>Avg Skill</th>
-              <th>Avg Stamina</th>
+              <th>Avg Stam</th>
             </tr>
           </thead>
           <tbody id="teamsBody"></tbody>
@@ -272,7 +342,6 @@
     </section>
 
     <section class="schedule" id="matchesSection" role="tabpanel" aria-labelledby="tabMatches" hidden>
-      <h2 style="margin:0 0 8px 0">Matches</h2>
       <div id="matchesList"></div>
     </section>
 
@@ -732,22 +801,11 @@
       const addBtn = document.getElementById('btnAddPlayer');
       if(addBtn) addBtn.disabled = !!hasTeams;
       const info = document.getElementById('genError');
-      if(hasTeams){
-        info.classList.remove('error');
-        info.style.display = '';
-        info.textContent = 'Players are locked because teams are generated. Tap Reset to start over.';
-      } else {
-        info.textContent = '';
-        info.style.display = 'none';
-      }
+      // Remove players-locked warning on Players tab
+      info.textContent = '';
+      info.style.display = 'none';
       const sec = document.getElementById('playersSection');
       sec.classList.toggle('locked', !!hasTeams);
-      const banner = document.getElementById('playersLockedMsg');
-      if(hasTeams){
-        banner.textContent = 'Players are locked — teams have been generated. Tap Reset to start over.';
-      } else {
-        banner.textContent = '';
-      }
     }
 
     function createListItem(name, isSelected){
@@ -966,6 +1024,8 @@
           label.style.flexWrap = 'nowrap';
           label.style.flexDirection = 'column';
           label.style.alignItems = 'flex-start';
+          // On tablet, CSS overrides this to a three-column grid via .match-label
+          label.classList.add('match-label');
           const teamABox = document.createElement('div');
           teamABox.style.display = 'flex';
           teamABox.style.flexDirection = 'column';
@@ -979,8 +1039,8 @@
           subA.textContent = (a.members || []).join(', ');
           teamABox.appendChild(pillA);
           teamABox.appendChild(subA);
-          teamABox.classList.add('match-team','a');
-          // Removed explicit 'vs' label for cleaner layout
+          teamABox.classList.add('match-team','a','team-card');
+          // Insert explicit VS on tablet layout
           const teamBBox = document.createElement('div');
           teamBBox.style.display = 'flex';
           teamBBox.style.flexDirection = 'column';
@@ -994,8 +1054,12 @@
           subB.textContent = (b.members || []).join(', ');
           teamBBox.appendChild(pillB);
           teamBBox.appendChild(subB);
-          teamBBox.classList.add('match-team','b');
+          teamBBox.classList.add('match-team','b','team-card');
+          const vsEl = document.createElement('div');
+          vsEl.className = 'vs';
+          vsEl.textContent = 'vs.';
           label.appendChild(teamABox);
+          label.appendChild(vsEl);
           label.appendChild(teamBBox);
 
           const score = document.createElement('div');
@@ -1123,10 +1187,7 @@
         return;
       }
 
-      const title = document.createElement('h2');
-      title.textContent = 'Leaderboard';
-      title.style.margin = '16px 0 8px 0';
-      lb.appendChild(title);
+      // Removed redundant 'Leaderboard' title for cleaner UI; tab already conveys context.
 
       // Compute points per team
       const byId = new Map(state.teams.map(t => [t.id, { team: t, pts: 0, played: 0, gf: 0, ga: 0 }]));
@@ -1165,7 +1226,7 @@
       wrap.style.overflow = 'auto';
       const table = document.createElement('table');
       const thead = document.createElement('thead');
-      thead.innerHTML = '<tr><th style="width:50%">Team</th><th>Played</th><th>Points</th><th>GD</th></tr>';
+      thead.innerHTML = '<tr><th style="width:50%">Team</th><th>Played</th><th>Points</th><th>GS</th><th>GA</th><th>GD</th></tr>';
       const tbody = document.createElement('tbody');
       const winningTeamId = (tournamentComplete && rows.length) ? rows[0].team.id : null;
       rows.forEach((r, idx)=>{
@@ -1204,12 +1265,21 @@
         tdPlayed.textContent = String(r.played);
         const tdPts = document.createElement('td');
         tdPts.textContent = String(r.pts);
-        const tdG = document.createElement('td');
+        const tdGS = document.createElement('td');
+        tdGS.textContent = String(r.gf);
+        const tdGA = document.createElement('td');
+        tdGA.textContent = String(r.ga || 0);
+        const tdGD = document.createElement('td');
         const gd = (r.gf - (r.ga || 0));
-        tdG.textContent = String(gd);
-        if(gd > 0) tdG.classList.add('gd-pos');
-        else if(gd < 0) tdG.classList.add('gd-neg');
-        tr.appendChild(tdTeam); tr.appendChild(tdPlayed); tr.appendChild(tdPts); tr.appendChild(tdG);
+        tdGD.textContent = String(gd);
+        if(gd > 0) tdGD.classList.add('gd-pos');
+        else if(gd < 0) tdGD.classList.add('gd-neg');
+        tr.appendChild(tdTeam);
+        tr.appendChild(tdPlayed);
+        tr.appendChild(tdPts);
+        tr.appendChild(tdGS);
+        tr.appendChild(tdGA);
+        tr.appendChild(tdGD);
         tbody.appendChild(tr);
       });
       table.appendChild(thead); table.appendChild(tbody);
